@@ -1,0 +1,25 @@
+{
+  // Beginner-friendly name shown by VS Code.
+  "name": "AI Security Log Analyzer Dev Container",
+
+  // Build from the local Dockerfile for reproducibility.
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+
+  // Open the project at this path inside the container.
+  "workspaceFolder": "/workspaces/ai-security-log-analyzer",
+
+  // Use the non-root user created in Dockerfile for safer development.
+  "remoteUser": "vscode",
+
+  // Keep editor setup minimal: only Python support.
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python"
+      ]
+    }
+  }
+}
