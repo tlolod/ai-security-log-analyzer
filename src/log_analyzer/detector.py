@@ -14,6 +14,7 @@ def detect_failed_login_bursts(
     events: list[LogEvent],
     threshold: int,
     window_minutes: int,
+    allowed_ips: list[str],
 ) -> list[Alert]:
     """Detect repeated failed logins from the same source IP address.
 
@@ -26,10 +27,11 @@ def detect_failed_login_bursts(
         A list of alerts for suspicious failed-login bursts.
     """
     failed_events_by_ip: defaultdict[str, list[LogEvent]] = defaultdict(list)
+    allowed_ip_set = set(allowed_ips)
 
     # Only failed-login events are relevant to this MVP detection rule.
     for event in events:
-        if event.event_type == "failed_login":
+        if event.event_type == "failed_login" and event.source_ip not in allowed_ip_set:
             failed_events_by_ip[event.source_ip].append(event)
 
     alerts: list[Alert] = []
@@ -86,6 +88,7 @@ def detect_failed_login_bursts(
 def detect_suspicious_usernames(
     events: list[LogEvent],
     targeted_usernames: list[str],
+    allowed_ips: list[str],
 ) -> list[Alert]:
     """Detect failed logins targeting commonly attacked usernames.
 
@@ -95,10 +98,14 @@ def detect_suspicious_usernames(
     alerts: list[Alert] = []
     alerted_pairs: set[tuple[str, str]] = set()
     targeted_username_set = {username.lower() for username in targeted_usernames}
+    allowed_ip_set = set(allowed_ips)
 
     for event in events:
         # This rule only applies to failed login attempts with a username.
         if event.event_type != "failed_login" or event.username is None:
+            continue
+
+        if event.source_ip in allowed_ip_set:
             continue
 
         username = event.username.lower()

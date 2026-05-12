@@ -9,5 +9,6 @@
     "postgres",
     "guest",
     "test"
-  ]
+  ],
+  "allowed_ips": []
 }

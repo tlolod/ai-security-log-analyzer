@@ -21,6 +21,7 @@ def test_default_config_returns_expected_values() -> None:
     assert config.window_minutes == 10
     assert "root" in config.targeted_usernames
     assert "admin" in config.targeted_usernames
+    assert config.allowed_ips == []
 
 
 def test_load_config_none_returns_defaults() -> None:
@@ -29,6 +30,7 @@ def test_load_config_none_returns_defaults() -> None:
 
     assert config.failed_login_threshold == 5
     assert config.window_minutes == 10
+    assert config.allowed_ips == []
 
 
 def test_load_config_reads_valid_json_file(tmp_path: Path) -> None:
@@ -39,7 +41,8 @@ def test_load_config_reads_valid_json_file(tmp_path: Path) -> None:
         {
           "failed_login_threshold": 8,
           "window_minutes": 15,
-          "targeted_usernames": ["Root", "Admin"]
+          "targeted_usernames": ["Root", "Admin"],
+          "allowed_ips": ["203.0.113.10"]
         }
         """,
     )
@@ -49,6 +52,7 @@ def test_load_config_reads_valid_json_file(tmp_path: Path) -> None:
     assert config.failed_login_threshold == 8
     assert config.window_minutes == 15
     assert config.targeted_usernames == ["root", "admin"]
+    assert config.allowed_ips == ["203.0.113.10"]
 
 
 def test_load_config_uses_defaults_for_missing_keys(tmp_path: Path) -> None:
@@ -63,6 +67,7 @@ def test_load_config_uses_defaults_for_missing_keys(tmp_path: Path) -> None:
     assert config.failed_login_threshold == 7
     assert config.window_minutes == 10
     assert "root" in config.targeted_usernames
+    assert config.allowed_ips == []
 
 
 def test_load_config_rejects_invalid_json(tmp_path: Path) -> None:
@@ -111,6 +116,39 @@ def test_load_config_rejects_invalid_usernames(tmp_path: Path) -> None:
     config_path = write_config_file(
         tmp_path / "config.json",
         '{"targeted_usernames": ["root", 123]}',
+    )
+
+    with pytest.raises(ValueError):
+        load_config(str(config_path))
+
+
+def test_load_config_rejects_allowed_ips_not_list(tmp_path: Path) -> None:
+    """allowed_ips must be a list, not a single string."""
+    config_path = write_config_file(
+        tmp_path / "config.json",
+        '{"allowed_ips": "203.0.113.10"}',
+    )
+
+    with pytest.raises(ValueError):
+        load_config(str(config_path))
+
+
+def test_load_config_rejects_non_string_allowed_ip(tmp_path: Path) -> None:
+    """Each allowed IP entry must be a string."""
+    config_path = write_config_file(
+        tmp_path / "config.json",
+        '{"allowed_ips": [123]}',
+    )
+
+    with pytest.raises(ValueError):
+        load_config(str(config_path))
+
+
+def test_load_config_rejects_invalid_allowed_ip(tmp_path: Path) -> None:
+    """Invalid IP address strings should fail validation."""
+    config_path = write_config_file(
+        tmp_path / "config.json",
+        '{"allowed_ips": ["not-an-ip"]}',
     )
 
     with pytest.raises(ValueError):

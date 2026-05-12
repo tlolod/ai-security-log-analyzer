@@ -10,6 +10,7 @@ from src.log_analyzer.models import LogEvent
 
 
 TARGETED_USERNAMES = ["root", "admin", "administrator", "oracle", "postgres", "guest", "test"]
+NO_ALLOWED_IPS: list[str] = []
 
 
 def make_log_event(
@@ -36,7 +37,7 @@ def test_detect_failed_login_bursts_creates_alert_when_threshold_met() -> None:
         for minute in range(5)
     ]
 
-    alerts = detect_failed_login_bursts(events, threshold=5, window_minutes=10)
+    alerts = detect_failed_login_bursts(events, threshold=5, window_minutes=10, allowed_ips=[])
 
     assert len(alerts) == 1
     alert = alerts[0]
@@ -57,7 +58,7 @@ def test_detect_failed_login_bursts_no_alert_below_threshold() -> None:
         for minute in range(4)
     ]
 
-    alerts = detect_failed_login_bursts(events, threshold=5, window_minutes=10)
+    alerts = detect_failed_login_bursts(events, threshold=5, window_minutes=10, allowed_ips=[])
 
     assert alerts == []
 
@@ -70,7 +71,7 @@ def test_detect_failed_login_bursts_no_alert_outside_window() -> None:
         for minute in [0, 3, 6, 9, 20]
     ]
 
-    alerts = detect_failed_login_bursts(events, threshold=5, window_minutes=10)
+    alerts = detect_failed_login_bursts(events, threshold=5, window_minutes=10, allowed_ips=[])
 
     assert alerts == []
 
@@ -87,7 +88,7 @@ def test_detect_failed_login_bursts_ignores_other_event_types() -> None:
         for minute in range(5)
     ]
 
-    alerts = detect_failed_login_bursts(events, threshold=5, window_minutes=10)
+    alerts = detect_failed_login_bursts(events, threshold=5, window_minutes=10, allowed_ips=[])
 
     assert alerts == []
 
@@ -108,6 +109,7 @@ def test_detect_failed_login_bursts_groups_by_source_ip() -> None:
         suspicious_events + normal_events,
         threshold=5,
         window_minutes=10,
+        allowed_ips=[],
     )
 
     assert len(alerts) == 1
@@ -122,7 +124,7 @@ def test_detect_suspicious_usernames_creates_alert_for_targeted_username() -> No
         username="root",
     )
 
-    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES)
+    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES, NO_ALLOWED_IPS)
 
     assert len(alerts) == 1
     alert = alerts[0]
@@ -143,7 +145,7 @@ def test_detect_suspicious_usernames_no_alert_for_normal_username() -> None:
         username="alice",
     )
 
-    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES)
+    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES, NO_ALLOWED_IPS)
 
     assert alerts == []
 
@@ -157,7 +159,7 @@ def test_detect_suspicious_usernames_ignores_non_failed_login_events() -> None:
         username="root",
     )
 
-    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES)
+    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES, NO_ALLOWED_IPS)
 
     assert alerts == []
 
@@ -170,7 +172,7 @@ def test_detect_suspicious_usernames_is_case_insensitive() -> None:
         username="Admin",
     )
 
-    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES)
+    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES, NO_ALLOWED_IPS)
 
     assert len(alerts) == 1
     assert "admin" in alerts[0].message
@@ -184,7 +186,7 @@ def test_detect_suspicious_usernames_avoids_duplicate_ip_username_alerts() -> No
         for minute in range(3)
     ]
 
-    alerts = detect_suspicious_usernames(events, TARGETED_USERNAMES)
+    alerts = detect_suspicious_usernames(events, TARGETED_USERNAMES, NO_ALLOWED_IPS)
 
     assert len(alerts) == 1
     assert alerts[0].source_ip == "203.0.113.10"
@@ -199,10 +201,64 @@ def test_detect_suspicious_usernames_alerts_per_unique_ip_username_pair() -> Non
         make_log_event(timestamp + timedelta(minutes=2), "198.51.100.77", username="admin"),
     ]
 
-    alerts = detect_suspicious_usernames(events, TARGETED_USERNAMES)
+    alerts = detect_suspicious_usernames(events, TARGETED_USERNAMES, NO_ALLOWED_IPS)
 
     assert len(alerts) == 3
     alert_pairs = {(alert.source_ip, alert.message) for alert in alerts}
     assert any(ip == "203.0.113.10" and "admin" in message for ip, message in alert_pairs)
     assert any(ip == "203.0.113.10" and "root" in message for ip, message in alert_pairs)
     assert any(ip == "198.51.100.77" and "admin" in message for ip, message in alert_pairs)
+
+
+def test_detect_failed_login_bursts_ignores_allowed_ip() -> None:
+    """Allowlisted IPs should not generate brute-force alerts."""
+    start_time = datetime(2026, 5, 11, 21, 33, 0)
+    events = [
+        make_log_event(start_time + timedelta(minutes=minute), "203.0.113.10")
+        for minute in range(5)
+    ]
+
+    alerts = detect_failed_login_bursts(
+        events,
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=["203.0.113.10"],
+    )
+
+    assert alerts == []
+
+
+def test_detect_suspicious_usernames_ignores_allowed_ip() -> None:
+    """Allowlisted IPs should not generate suspicious-username alerts."""
+    event = make_log_event(
+        datetime(2026, 5, 11, 21, 33, 0),
+        "203.0.113.10",
+        username="root",
+    )
+
+    alerts = detect_suspicious_usernames(
+        [event],
+        TARGETED_USERNAMES,
+        allowed_ips=["203.0.113.10"],
+    )
+
+    assert alerts == []
+
+
+def test_allowed_ips_do_not_suppress_other_ips() -> None:
+    """Only the exact allowlisted IP should be suppressed."""
+    start_time = datetime(2026, 5, 11, 21, 33, 0)
+    events = [
+        make_log_event(start_time + timedelta(minutes=minute), "203.0.113.10")
+        for minute in range(5)
+    ]
+
+    alerts = detect_failed_login_bursts(
+        events,
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=["198.51.100.77"],
+    )
+
+    assert len(alerts) == 1
+    assert alerts[0].source_ip == "203.0.113.10"

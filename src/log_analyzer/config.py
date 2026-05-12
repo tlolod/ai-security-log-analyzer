@@ -4,6 +4,7 @@ Configuration is treated as untrusted input. This module loads JSON safely,
 validates expected fields, and returns a small dataclass used by the CLI.
 """
 
+import ipaddress
 import json
 from dataclasses import dataclass
 from json import JSONDecodeError
@@ -14,6 +15,7 @@ ALLOWED_CONFIG_KEYS = {
     "failed_login_threshold",
     "window_minutes",
     "targeted_usernames",
+    "allowed_ips",
 }
 
 
@@ -24,6 +26,7 @@ class AnalyzerConfig:
     failed_login_threshold: int
     window_minutes: int
     targeted_usernames: list[str]
+    allowed_ips: list[str]
 
 
 def default_config() -> AnalyzerConfig:
@@ -44,6 +47,7 @@ def default_config() -> AnalyzerConfig:
             "guest",
             "test",
         ],
+        allowed_ips=[],
     )
 
 
@@ -101,6 +105,9 @@ def config_from_dict(data: dict[str, object]) -> AnalyzerConfig:
     if "targeted_usernames" in data:
         config.targeted_usernames = _validate_usernames(data["targeted_usernames"])
 
+    if "allowed_ips" in data:
+        config.allowed_ips = _validate_ip_addresses(data["allowed_ips"])
+
     return config
 
 
@@ -124,3 +131,21 @@ def _validate_usernames(value: object) -> list[str]:
         usernames.append(username.lower())
 
     return usernames
+
+
+def _validate_ip_addresses(value: object) -> list[str]:
+    """Validate and normalize exact IP addresses used for alert suppression."""
+    if not isinstance(value, list):
+        raise ValueError("Config value 'allowed_ips' must be a list of IP address strings.")
+
+    allowed_ips: list[str] = []
+    for ip_text in value:
+        if not isinstance(ip_text, str):
+            raise ValueError("Config value 'allowed_ips' must be a list of IP address strings.")
+
+        try:
+            allowed_ips.append(str(ipaddress.ip_address(ip_text)))
+        except ValueError as error:
+            raise ValueError(f"Invalid IP address in allowed_ips: {ip_text}") from error
+
+    return allowed_ips
