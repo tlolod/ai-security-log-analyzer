@@ -10,7 +10,7 @@ It should stay small and avoid complex business logic.
 import argparse
 from datetime import datetime
 
-from .detector import detect_failed_login_bursts
+from .detector import detect_failed_login_bursts, detect_suspicious_usernames
 from .formatter import print_alerts, print_summary
 from .loader import load_log_lines
 from .models import RunStats
@@ -51,6 +51,7 @@ def run(file_path: str, threshold: int, window_minutes: int, year: int) -> int:
         lines = load_log_lines(file_path)
         events, skipped_lines = parse_lines(lines, year)
         alerts = detect_failed_login_bursts(events, threshold, window_minutes)
+        alerts.extend(detect_suspicious_usernames(events))
 
         print_alerts(alerts)
 

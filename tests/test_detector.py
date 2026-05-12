@@ -2,7 +2,10 @@
 
 from datetime import datetime, timedelta
 
-from src.log_analyzer.detector import detect_failed_login_bursts
+from src.log_analyzer.detector import (
+    detect_failed_login_bursts,
+    detect_suspicious_usernames,
+)
 from src.log_analyzer.models import LogEvent
 
 
@@ -10,12 +13,13 @@ def make_log_event(
     timestamp: datetime,
     source_ip: str,
     event_type: str = "failed_login",
+    username: str | None = "admin",
 ) -> LogEvent:
     """Create a small deterministic LogEvent for detector tests."""
     return LogEvent(
         timestamp=timestamp,
         source_ip=source_ip,
-        username="admin",
+        username=username,
         event_type=event_type,
         raw_line=f"sample raw line from {source_ip} at {timestamp.isoformat()}",
     )
@@ -105,3 +109,97 @@ def test_detect_failed_login_bursts_groups_by_source_ip() -> None:
 
     assert len(alerts) == 1
     assert alerts[0].source_ip == "203.0.113.10"
+
+
+def test_detect_suspicious_usernames_creates_alert_for_targeted_username() -> None:
+    """A failed login to root should create a low-severity alert."""
+    event = make_log_event(
+        datetime(2026, 5, 11, 21, 33, 0),
+        "203.0.113.10",
+        username="root",
+    )
+
+    alerts = detect_suspicious_usernames([event])
+
+    assert len(alerts) == 1
+    alert = alerts[0]
+    assert alert.alert_type == "suspicious_username_targeted"
+    assert alert.severity == "low"
+    assert alert.source_ip == "203.0.113.10"
+    assert alert.first_seen == event.timestamp
+    assert alert.last_seen == event.timestamp
+    assert alert.failed_count == 1
+    assert alert.evidence == [event.raw_line]
+
+
+def test_detect_suspicious_usernames_no_alert_for_normal_username() -> None:
+    """A normal username should not trigger the targeted-username rule."""
+    event = make_log_event(
+        datetime(2026, 5, 11, 21, 33, 0),
+        "203.0.113.10",
+        username="alice",
+    )
+
+    alerts = detect_suspicious_usernames([event])
+
+    assert alerts == []
+
+
+def test_detect_suspicious_usernames_ignores_non_failed_login_events() -> None:
+    """Targeted usernames should only alert for failed_login events."""
+    event = make_log_event(
+        datetime(2026, 5, 11, 21, 33, 0),
+        "203.0.113.10",
+        event_type="accepted_login",
+        username="root",
+    )
+
+    alerts = detect_suspicious_usernames([event])
+
+    assert alerts == []
+
+
+def test_detect_suspicious_usernames_is_case_insensitive() -> None:
+    """Usernames should match even when log casing differs."""
+    event = make_log_event(
+        datetime(2026, 5, 11, 21, 33, 0),
+        "203.0.113.10",
+        username="Admin",
+    )
+
+    alerts = detect_suspicious_usernames([event])
+
+    assert len(alerts) == 1
+    assert "admin" in alerts[0].message
+
+
+def test_detect_suspicious_usernames_avoids_duplicate_ip_username_alerts() -> None:
+    """Repeated attempts for the same IP and username should alert once."""
+    start_time = datetime(2026, 5, 11, 21, 33, 0)
+    events = [
+        make_log_event(start_time + timedelta(minutes=minute), "203.0.113.10", username="admin")
+        for minute in range(3)
+    ]
+
+    alerts = detect_suspicious_usernames(events)
+
+    assert len(alerts) == 1
+    assert alerts[0].source_ip == "203.0.113.10"
+
+
+def test_detect_suspicious_usernames_alerts_per_unique_ip_username_pair() -> None:
+    """Different IP and username pairs should each receive their own alert."""
+    timestamp = datetime(2026, 5, 11, 21, 33, 0)
+    events = [
+        make_log_event(timestamp, "203.0.113.10", username="admin"),
+        make_log_event(timestamp + timedelta(minutes=1), "203.0.113.10", username="root"),
+        make_log_event(timestamp + timedelta(minutes=2), "198.51.100.77", username="admin"),
+    ]
+
+    alerts = detect_suspicious_usernames(events)
+
+    assert len(alerts) == 3
+    alert_pairs = {(alert.source_ip, alert.message) for alert in alerts}
+    assert any(ip == "203.0.113.10" and "admin" in message for ip, message in alert_pairs)
+    assert any(ip == "203.0.113.10" and "root" in message for ip, message in alert_pairs)
+    assert any(ip == "198.51.100.77" and "admin" in message for ip, message in alert_pairs)

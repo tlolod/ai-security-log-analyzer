@@ -10,6 +10,17 @@ from datetime import timedelta
 from .models import Alert, LogEvent
 
 
+TARGETED_USERNAMES = {
+    "root",
+    "admin",
+    "administrator",
+    "oracle",
+    "postgres",
+    "guest",
+    "test",
+}
+
+
 def detect_failed_login_bursts(
     events: list[LogEvent],
     threshold: int,
@@ -79,5 +90,45 @@ def detect_failed_login_bursts(
                 continue
 
             window_end_index += 1
+
+    return alerts
+
+
+def detect_suspicious_usernames(events: list[LogEvent]) -> list[Alert]:
+    """Detect failed logins targeting commonly attacked usernames.
+
+    One alert is created for each unique source IP and targeted username pair.
+    This keeps the output useful without creating repeated duplicate alerts.
+    """
+    alerts: list[Alert] = []
+    alerted_pairs: set[tuple[str, str]] = set()
+
+    for event in events:
+        # This rule only applies to failed login attempts with a username.
+        if event.event_type != "failed_login" or event.username is None:
+            continue
+
+        username = event.username.lower()
+        alert_key = (event.source_ip, username)
+
+        if username not in TARGETED_USERNAMES or alert_key in alerted_pairs:
+            continue
+
+        alerts.append(
+            Alert(
+                alert_type="suspicious_username_targeted",
+                severity="low",
+                message=(
+                    "Failed login attempt targeted commonly attacked username "
+                    f"'{username}' from {event.source_ip}."
+                ),
+                source_ip=event.source_ip,
+                first_seen=event.timestamp,
+                last_seen=event.timestamp,
+                failed_count=1,
+                evidence=[event.raw_line],
+            )
+        )
+        alerted_pairs.add(alert_key)
 
     return alerts
