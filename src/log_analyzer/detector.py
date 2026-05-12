@@ -10,17 +10,6 @@ from datetime import timedelta
 from .models import Alert, LogEvent
 
 
-TARGETED_USERNAMES = {
-    "root",
-    "admin",
-    "administrator",
-    "oracle",
-    "postgres",
-    "guest",
-    "test",
-}
-
-
 def detect_failed_login_bursts(
     events: list[LogEvent],
     threshold: int,
@@ -94,7 +83,10 @@ def detect_failed_login_bursts(
     return alerts
 
 
-def detect_suspicious_usernames(events: list[LogEvent]) -> list[Alert]:
+def detect_suspicious_usernames(
+    events: list[LogEvent],
+    targeted_usernames: list[str],
+) -> list[Alert]:
     """Detect failed logins targeting commonly attacked usernames.
 
     One alert is created for each unique source IP and targeted username pair.
@@ -102,6 +94,7 @@ def detect_suspicious_usernames(events: list[LogEvent]) -> list[Alert]:
     """
     alerts: list[Alert] = []
     alerted_pairs: set[tuple[str, str]] = set()
+    targeted_username_set = {username.lower() for username in targeted_usernames}
 
     for event in events:
         # This rule only applies to failed login attempts with a username.
@@ -111,7 +104,7 @@ def detect_suspicious_usernames(events: list[LogEvent]) -> list[Alert]:
         username = event.username.lower()
         alert_key = (event.source_ip, username)
 
-        if username not in TARGETED_USERNAMES or alert_key in alerted_pairs:
+        if username not in targeted_username_set or alert_key in alerted_pairs:
             continue
 
         alerts.append(

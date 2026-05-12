@@ -10,6 +10,7 @@ It should stay small and avoid complex business logic.
 import argparse
 from datetime import datetime
 
+from .config import load_config
 from .detector import detect_failed_login_bursts, detect_suspicious_usernames
 from .formatter import print_alerts, print_summary, write_alerts_to_json
 from .loader import load_log_lines
@@ -22,11 +23,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="AI Security Log Analyzer - MVP v1")
 
     parser.add_argument("--file", required=True, help="Path to local log file")
-    parser.add_argument("--threshold", type=int, default=5, help="Failed login threshold")
+    parser.add_argument("--threshold", type=int, default=None, help="Failed login threshold")
     parser.add_argument(
         "--window",
         type=int,
-        default=10,
+        default=None,
         help="Detection window size in minutes",
     )
     parser.add_argument(
@@ -35,6 +36,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=datetime.now().year,
         help="Year for syslog timestamps",
     )
+    parser.add_argument("--config", help="Optional path to JSON configuration file")
     parser.add_argument("--output", help="Optional path to write alerts as JSON")
 
     return parser
@@ -42,9 +44,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def run(
     file_path: str,
-    threshold: int,
-    window_minutes: int,
+    threshold: int | None,
+    window_minutes: int | None,
     year: int,
+    config_path: str | None = None,
     output_path: str | None = None,
 ) -> int:
     """Run the analyzer pipeline and return a process-style exit code.
@@ -55,10 +58,22 @@ def run(
     try:
         # Each step calls one layer of the pipeline, keeping responsibilities
         # clear and easy for beginners to trace.
+        config = load_config(config_path)
+
+        # CLI values intentionally override config file values.
+        if threshold is not None:
+            config.failed_login_threshold = threshold
+        if window_minutes is not None:
+            config.window_minutes = window_minutes
+
         lines = load_log_lines(file_path)
         events, skipped_lines = parse_lines(lines, year)
-        alerts = detect_failed_login_bursts(events, threshold, window_minutes)
-        alerts.extend(detect_suspicious_usernames(events))
+        alerts = detect_failed_login_bursts(
+            events,
+            config.failed_login_threshold,
+            config.window_minutes,
+        )
+        alerts.extend(detect_suspicious_usernames(events, config.targeted_usernames))
 
         print_alerts(alerts)
 
@@ -91,6 +106,7 @@ def main() -> None:
         threshold=args.threshold,
         window_minutes=args.window,
         year=args.year,
+        config_path=args.config,
         output_path=args.output,
     )
     raise SystemExit(exit_code)

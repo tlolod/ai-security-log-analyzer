@@ -1,0 +1,13 @@
+{
+  "failed_login_threshold": 5,
+  "window_minutes": 10,
+  "targeted_usernames": [
+    "root",
+    "admin",
+    "administrator",
+    "oracle",
+    "postgres",
+    "guest",
+    "test"
+  ]
+}

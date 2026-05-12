@@ -9,6 +9,9 @@ from src.log_analyzer.detector import (
 from src.log_analyzer.models import LogEvent
 
 
+TARGETED_USERNAMES = ["root", "admin", "administrator", "oracle", "postgres", "guest", "test"]
+
+
 def make_log_event(
     timestamp: datetime,
     source_ip: str,
@@ -119,7 +122,7 @@ def test_detect_suspicious_usernames_creates_alert_for_targeted_username() -> No
         username="root",
     )
 
-    alerts = detect_suspicious_usernames([event])
+    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES)
 
     assert len(alerts) == 1
     alert = alerts[0]
@@ -140,7 +143,7 @@ def test_detect_suspicious_usernames_no_alert_for_normal_username() -> None:
         username="alice",
     )
 
-    alerts = detect_suspicious_usernames([event])
+    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES)
 
     assert alerts == []
 
@@ -154,7 +157,7 @@ def test_detect_suspicious_usernames_ignores_non_failed_login_events() -> None:
         username="root",
     )
 
-    alerts = detect_suspicious_usernames([event])
+    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES)
 
     assert alerts == []
 
@@ -167,7 +170,7 @@ def test_detect_suspicious_usernames_is_case_insensitive() -> None:
         username="Admin",
     )
 
-    alerts = detect_suspicious_usernames([event])
+    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES)
 
     assert len(alerts) == 1
     assert "admin" in alerts[0].message
@@ -181,7 +184,7 @@ def test_detect_suspicious_usernames_avoids_duplicate_ip_username_alerts() -> No
         for minute in range(3)
     ]
 
-    alerts = detect_suspicious_usernames(events)
+    alerts = detect_suspicious_usernames(events, TARGETED_USERNAMES)
 
     assert len(alerts) == 1
     assert alerts[0].source_ip == "203.0.113.10"
@@ -196,7 +199,7 @@ def test_detect_suspicious_usernames_alerts_per_unique_ip_username_pair() -> Non
         make_log_event(timestamp + timedelta(minutes=2), "198.51.100.77", username="admin"),
     ]
 
-    alerts = detect_suspicious_usernames(events)
+    alerts = detect_suspicious_usernames(events, TARGETED_USERNAMES)
 
     assert len(alerts) == 3
     alert_pairs = {(alert.source_ip, alert.message) for alert in alerts}
