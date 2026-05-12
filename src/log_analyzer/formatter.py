@@ -5,6 +5,7 @@ It does not load files, parse logs, or detect suspicious activity.
 """
 
 import json
+from pathlib import Path
 
 from .models import Alert, RunStats
 
@@ -45,3 +46,25 @@ def print_summary(stats: RunStats) -> None:
     print(f"Parsed events: {stats.parsed_events}")
     print(f"Skipped lines: {stats.skipped_lines}")
     print(f"Alerts generated: {stats.alerts_generated}")
+
+
+def write_alerts_to_json(alerts: list[Alert], output_path: str) -> None:
+    """Write alerts to a JSON file.
+
+    The formatter owns this because JSON export is another output format.
+    The detector still only creates alerts; it does not write files.
+    """
+    path = Path(output_path)
+
+    if path.exists() and path.is_dir():
+        raise ValueError(f"Output path is a directory: {output_path}")
+
+    if path.parent != Path(".") and not path.parent.exists():
+        raise FileNotFoundError(f"Output directory does not exist: {path.parent}")
+
+    payload = {
+        "alerts": [format_alert(alert) for alert in alerts],
+        "alert_count": len(alerts),
+    }
+
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

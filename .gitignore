@@ -30,3 +30,7 @@ htmlcov/
 *.log
 tmp/
 temp/
+
+# Generated analyzer output
+alerts.json
+*.alerts.json

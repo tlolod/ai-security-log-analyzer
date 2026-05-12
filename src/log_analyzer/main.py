@@ -11,7 +11,7 @@ import argparse
 from datetime import datetime
 
 from .detector import detect_failed_login_bursts, detect_suspicious_usernames
-from .formatter import print_alerts, print_summary
+from .formatter import print_alerts, print_summary, write_alerts_to_json
 from .loader import load_log_lines
 from .models import RunStats
 from .parser import parse_lines
@@ -35,11 +35,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=datetime.now().year,
         help="Year for syslog timestamps",
     )
+    parser.add_argument("--output", help="Optional path to write alerts as JSON")
 
     return parser
 
 
-def run(file_path: str, threshold: int, window_minutes: int, year: int) -> int:
+def run(
+    file_path: str,
+    threshold: int,
+    window_minutes: int,
+    year: int,
+    output_path: str | None = None,
+) -> int:
     """Run the analyzer pipeline and return a process-style exit code.
 
     Returns:
@@ -54,6 +61,9 @@ def run(file_path: str, threshold: int, window_minutes: int, year: int) -> int:
         alerts.extend(detect_suspicious_usernames(events))
 
         print_alerts(alerts)
+
+        if output_path is not None:
+            write_alerts_to_json(alerts, output_path)
 
         stats = RunStats(
             total_lines=len(lines),
@@ -81,6 +91,7 @@ def main() -> None:
         threshold=args.threshold,
         window_minutes=args.window,
         year=args.year,
+        output_path=args.output,
     )
     raise SystemExit(exit_code)
 
