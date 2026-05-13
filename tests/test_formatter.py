@@ -14,6 +14,9 @@ def make_alert() -> Alert:
     """Create a deterministic alert for formatter tests."""
     return Alert(
         alert_type="brute_force_suspected",
+        rule_id="AUTH-001",
+        rule_name="SSH Brute Force Suspected",
+        rule_version="1.0",
         severity="medium",
         message="Detected 5 failed login attempts from 203.0.113.10 within 10 minutes.",
         source_ip="203.0.113.10",
@@ -31,6 +34,9 @@ def test_format_alert_returns_json_serializable_dict() -> None:
     alert_data = format_alert(alert)
 
     assert alert_data["alert_type"] == "brute_force_suspected"
+    assert alert_data["rule_id"] == "AUTH-001"
+    assert alert_data["rule_name"] == "SSH Brute Force Suspected"
+    assert alert_data["rule_version"] == "1.0"
     assert alert_data["severity"] == "medium"
     assert alert_data["source_ip"] == "203.0.113.10"
     assert alert_data["first_seen"] == "2026-05-11T21:33:01"
@@ -49,6 +55,9 @@ def test_write_alerts_to_json_writes_alert_payload(tmp_path: Path) -> None:
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     assert payload["alert_count"] == 1
     assert len(payload["alerts"]) == 1
+    assert payload["alerts"][0]["rule_id"] == "AUTH-001"
+    assert payload["alerts"][0]["rule_name"] == "SSH Brute Force Suspected"
+    assert payload["alerts"][0]["rule_version"] == "1.0"
     assert payload["alerts"][0]["source_ip"] == "203.0.113.10"
     assert payload["alerts"][0]["first_seen"] == "2026-05-11T21:33:01"
 

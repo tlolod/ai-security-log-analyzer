@@ -52,6 +52,9 @@ def test_detect_failed_login_bursts_creates_alert_when_threshold_met() -> None:
     assert len(alerts) == 1
     alert = alerts[0]
     assert alert.alert_type == "brute_force_suspected"
+    assert alert.rule_id == "AUTH-001"
+    assert alert.rule_name == "SSH Brute Force Suspected"
+    assert alert.rule_version == "1.0"
     assert alert.severity == "medium"
     assert alert.source_ip == "203.0.113.10"
     assert alert.first_seen == start_time
@@ -158,6 +161,9 @@ def test_detect_suspicious_usernames_creates_alert_for_targeted_username() -> No
     assert len(alerts) == 1
     alert = alerts[0]
     assert alert.alert_type == "suspicious_username_targeted"
+    assert alert.rule_id == "AUTH-002"
+    assert alert.rule_name == "Suspicious Username Targeted"
+    assert alert.rule_version == "1.0"
     assert alert.severity == "low"
     assert alert.source_ip == "203.0.113.10"
     assert alert.first_seen == event.timestamp

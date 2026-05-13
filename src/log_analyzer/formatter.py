@@ -18,6 +18,9 @@ def format_alert(alert: Alert) -> dict[str, object]:
     """
     return {
         "alert_type": alert.alert_type,
+        "rule_id": alert.rule_id,
+        "rule_name": alert.rule_name,
+        "rule_version": alert.rule_version,
         "severity": alert.severity,
         "message": alert.message,
         "source_ip": alert.source_ip,

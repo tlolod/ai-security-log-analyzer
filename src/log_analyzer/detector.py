@@ -10,6 +10,15 @@ from datetime import timedelta
 from .models import Alert, LogEvent
 
 
+BRUTE_FORCE_RULE_ID = "AUTH-001"
+BRUTE_FORCE_RULE_NAME = "SSH Brute Force Suspected"
+BRUTE_FORCE_RULE_VERSION = "1.0"
+
+SUSPICIOUS_USERNAME_RULE_ID = "AUTH-002"
+SUSPICIOUS_USERNAME_RULE_NAME = "Suspicious Username Targeted"
+SUSPICIOUS_USERNAME_RULE_VERSION = "1.0"
+
+
 def detect_failed_login_bursts(
     events: list[LogEvent],
     threshold: int,
@@ -63,6 +72,9 @@ def detect_failed_login_bursts(
                 alerts.append(
                     Alert(
                         alert_type="brute_force_suspected",
+                        rule_id=BRUTE_FORCE_RULE_ID,
+                        rule_name=BRUTE_FORCE_RULE_NAME,
+                        rule_version=BRUTE_FORCE_RULE_VERSION,
                         severity=severity_policy["brute_force_suspected"],
                         message=(
                             f"Detected {failed_count} failed login attempts from "
@@ -119,6 +131,9 @@ def detect_suspicious_usernames(
         alerts.append(
             Alert(
                 alert_type="suspicious_username_targeted",
+                rule_id=SUSPICIOUS_USERNAME_RULE_ID,
+                rule_name=SUSPICIOUS_USERNAME_RULE_NAME,
+                rule_version=SUSPICIOUS_USERNAME_RULE_VERSION,
                 severity=severity_policy["suspicious_username_targeted"],
                 message=(
                     "Failed login attempt targeted commonly attacked username "

@@ -38,6 +38,9 @@ class Alert:
     """
 
     alert_type: str
+    rule_id: str
+    rule_name: str
+    rule_version: str
     severity: str
     message: str
     source_ip: str
