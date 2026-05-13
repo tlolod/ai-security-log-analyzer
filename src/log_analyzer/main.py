@@ -12,7 +12,13 @@ from datetime import datetime
 
 from .config import load_config
 from .detector import detect_failed_login_bursts, detect_suspicious_usernames
-from .formatter import print_alerts, print_summary, write_alerts_to_json
+from .formatter import (
+    build_alert_summary,
+    print_alert_summary,
+    print_alerts,
+    print_summary,
+    write_alerts_to_json,
+)
 from .loader import load_log_lines
 from .models import RunStats
 from .parser import parse_lines
@@ -85,6 +91,8 @@ def run(
         )
 
         print_alerts(alerts)
+        alert_summary = build_alert_summary(alerts)
+        print_alert_summary(alert_summary)
 
         if output_path is not None:
             write_alerts_to_json(alerts, output_path)
