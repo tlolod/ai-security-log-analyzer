@@ -16,6 +16,14 @@ ALLOWED_CONFIG_KEYS = {
     "window_minutes",
     "targeted_usernames",
     "allowed_ips",
+    "severity_policy",
+}
+
+ALLOWED_SEVERITIES = {"low", "medium", "high", "critical"}
+
+KNOWN_ALERT_TYPES = {
+    "brute_force_suspected",
+    "suspicious_username_targeted",
 }
 
 
@@ -27,6 +35,7 @@ class AnalyzerConfig:
     window_minutes: int
     targeted_usernames: list[str]
     allowed_ips: list[str]
+    severity_policy: dict[str, str]
 
 
 def default_config() -> AnalyzerConfig:
@@ -48,7 +57,16 @@ def default_config() -> AnalyzerConfig:
             "test",
         ],
         allowed_ips=[],
+        severity_policy=default_severity_policy(),
     )
+
+
+def default_severity_policy() -> dict[str, str]:
+    """Return fresh default severity labels for known alert types."""
+    return {
+        "brute_force_suspected": "medium",
+        "suspicious_username_targeted": "low",
+    }
 
 
 def load_config(config_path: str | None) -> AnalyzerConfig:
@@ -108,6 +126,9 @@ def config_from_dict(data: dict[str, object]) -> AnalyzerConfig:
     if "allowed_ips" in data:
         config.allowed_ips = _validate_ip_addresses(data["allowed_ips"])
 
+    if "severity_policy" in data:
+        config.severity_policy = _validate_severity_policy(data["severity_policy"])
+
     return config
 
 
@@ -149,3 +170,26 @@ def _validate_ip_addresses(value: object) -> list[str]:
             raise ValueError(f"Invalid IP address in allowed_ips: {ip_text}") from error
 
     return allowed_ips
+
+
+def _validate_severity_policy(value: object) -> dict[str, str]:
+    """Validate and merge severity policy overrides with defaults."""
+    if not isinstance(value, dict):
+        raise ValueError("Config value 'severity_policy' must be a JSON object.")
+
+    severity_policy = default_severity_policy()
+
+    for alert_type, severity in value.items():
+        if alert_type not in KNOWN_ALERT_TYPES:
+            raise ValueError(f"Unknown severity policy alert type: {alert_type}")
+
+        if not isinstance(severity, str):
+            raise ValueError("Severity policy values must be strings.")
+
+        normalized_severity = severity.lower()
+        if normalized_severity not in ALLOWED_SEVERITIES:
+            raise ValueError(f"Invalid severity value: {severity}")
+
+        severity_policy[alert_type] = normalized_severity
+
+    return severity_policy

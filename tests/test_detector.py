@@ -11,6 +11,10 @@ from src.log_analyzer.models import LogEvent
 
 TARGETED_USERNAMES = ["root", "admin", "administrator", "oracle", "postgres", "guest", "test"]
 NO_ALLOWED_IPS: list[str] = []
+SEVERITY_POLICY = {
+    "brute_force_suspected": "medium",
+    "suspicious_username_targeted": "low",
+}
 
 
 def make_log_event(
@@ -37,7 +41,13 @@ def test_detect_failed_login_bursts_creates_alert_when_threshold_met() -> None:
         for minute in range(5)
     ]
 
-    alerts = detect_failed_login_bursts(events, threshold=5, window_minutes=10, allowed_ips=[])
+    alerts = detect_failed_login_bursts(
+        events,
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=[],
+        severity_policy=SEVERITY_POLICY,
+    )
 
     assert len(alerts) == 1
     alert = alerts[0]
@@ -58,7 +68,13 @@ def test_detect_failed_login_bursts_no_alert_below_threshold() -> None:
         for minute in range(4)
     ]
 
-    alerts = detect_failed_login_bursts(events, threshold=5, window_minutes=10, allowed_ips=[])
+    alerts = detect_failed_login_bursts(
+        events,
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=[],
+        severity_policy=SEVERITY_POLICY,
+    )
 
     assert alerts == []
 
@@ -71,7 +87,13 @@ def test_detect_failed_login_bursts_no_alert_outside_window() -> None:
         for minute in [0, 3, 6, 9, 20]
     ]
 
-    alerts = detect_failed_login_bursts(events, threshold=5, window_minutes=10, allowed_ips=[])
+    alerts = detect_failed_login_bursts(
+        events,
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=[],
+        severity_policy=SEVERITY_POLICY,
+    )
 
     assert alerts == []
 
@@ -88,7 +110,13 @@ def test_detect_failed_login_bursts_ignores_other_event_types() -> None:
         for minute in range(5)
     ]
 
-    alerts = detect_failed_login_bursts(events, threshold=5, window_minutes=10, allowed_ips=[])
+    alerts = detect_failed_login_bursts(
+        events,
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=[],
+        severity_policy=SEVERITY_POLICY,
+    )
 
     assert alerts == []
 
@@ -110,6 +138,7 @@ def test_detect_failed_login_bursts_groups_by_source_ip() -> None:
         threshold=5,
         window_minutes=10,
         allowed_ips=[],
+        severity_policy=SEVERITY_POLICY,
     )
 
     assert len(alerts) == 1
@@ -124,7 +153,7 @@ def test_detect_suspicious_usernames_creates_alert_for_targeted_username() -> No
         username="root",
     )
 
-    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES, NO_ALLOWED_IPS)
+    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES, NO_ALLOWED_IPS, SEVERITY_POLICY)
 
     assert len(alerts) == 1
     alert = alerts[0]
@@ -145,7 +174,7 @@ def test_detect_suspicious_usernames_no_alert_for_normal_username() -> None:
         username="alice",
     )
 
-    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES, NO_ALLOWED_IPS)
+    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES, NO_ALLOWED_IPS, SEVERITY_POLICY)
 
     assert alerts == []
 
@@ -159,7 +188,7 @@ def test_detect_suspicious_usernames_ignores_non_failed_login_events() -> None:
         username="root",
     )
 
-    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES, NO_ALLOWED_IPS)
+    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES, NO_ALLOWED_IPS, SEVERITY_POLICY)
 
     assert alerts == []
 
@@ -172,7 +201,7 @@ def test_detect_suspicious_usernames_is_case_insensitive() -> None:
         username="Admin",
     )
 
-    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES, NO_ALLOWED_IPS)
+    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES, NO_ALLOWED_IPS, SEVERITY_POLICY)
 
     assert len(alerts) == 1
     assert "admin" in alerts[0].message
@@ -186,7 +215,7 @@ def test_detect_suspicious_usernames_avoids_duplicate_ip_username_alerts() -> No
         for minute in range(3)
     ]
 
-    alerts = detect_suspicious_usernames(events, TARGETED_USERNAMES, NO_ALLOWED_IPS)
+    alerts = detect_suspicious_usernames(events, TARGETED_USERNAMES, NO_ALLOWED_IPS, SEVERITY_POLICY)
 
     assert len(alerts) == 1
     assert alerts[0].source_ip == "203.0.113.10"
@@ -201,7 +230,7 @@ def test_detect_suspicious_usernames_alerts_per_unique_ip_username_pair() -> Non
         make_log_event(timestamp + timedelta(minutes=2), "198.51.100.77", username="admin"),
     ]
 
-    alerts = detect_suspicious_usernames(events, TARGETED_USERNAMES, NO_ALLOWED_IPS)
+    alerts = detect_suspicious_usernames(events, TARGETED_USERNAMES, NO_ALLOWED_IPS, SEVERITY_POLICY)
 
     assert len(alerts) == 3
     alert_pairs = {(alert.source_ip, alert.message) for alert in alerts}
@@ -223,6 +252,7 @@ def test_detect_failed_login_bursts_ignores_allowed_ip() -> None:
         threshold=5,
         window_minutes=10,
         allowed_ips=["203.0.113.10"],
+        severity_policy=SEVERITY_POLICY,
     )
 
     assert alerts == []
@@ -240,6 +270,7 @@ def test_detect_suspicious_usernames_ignores_allowed_ip() -> None:
         [event],
         TARGETED_USERNAMES,
         allowed_ips=["203.0.113.10"],
+        severity_policy=SEVERITY_POLICY,
     )
 
     assert alerts == []
@@ -258,7 +289,55 @@ def test_allowed_ips_do_not_suppress_other_ips() -> None:
         threshold=5,
         window_minutes=10,
         allowed_ips=["198.51.100.77"],
+        severity_policy=SEVERITY_POLICY,
     )
 
     assert len(alerts) == 1
     assert alerts[0].source_ip == "203.0.113.10"
+
+
+def test_detect_failed_login_bursts_uses_configured_severity() -> None:
+    """Brute-force alerts should use severity from the config policy."""
+    start_time = datetime(2026, 5, 11, 21, 33, 0)
+    events = [
+        make_log_event(start_time + timedelta(minutes=minute), "203.0.113.10")
+        for minute in range(5)
+    ]
+    severity_policy = {
+        "brute_force_suspected": "high",
+        "suspicious_username_targeted": "low",
+    }
+
+    alerts = detect_failed_login_bursts(
+        events,
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=[],
+        severity_policy=severity_policy,
+    )
+
+    assert len(alerts) == 1
+    assert alerts[0].severity == "high"
+
+
+def test_detect_suspicious_usernames_uses_configured_severity() -> None:
+    """Suspicious-username alerts should use severity from the config policy."""
+    event = make_log_event(
+        datetime(2026, 5, 11, 21, 33, 0),
+        "203.0.113.10",
+        username="root",
+    )
+    severity_policy = {
+        "brute_force_suspected": "medium",
+        "suspicious_username_targeted": "medium",
+    }
+
+    alerts = detect_suspicious_usernames(
+        [event],
+        TARGETED_USERNAMES,
+        allowed_ips=[],
+        severity_policy=severity_policy,
+    )
+
+    assert len(alerts) == 1
+    assert alerts[0].severity == "medium"

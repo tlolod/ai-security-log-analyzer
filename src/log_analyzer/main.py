@@ -73,12 +73,14 @@ def run(
             config.failed_login_threshold,
             config.window_minutes,
             config.allowed_ips,
+            config.severity_policy,
         )
         alerts.extend(
             detect_suspicious_usernames(
                 events,
                 config.targeted_usernames,
                 config.allowed_ips,
+                config.severity_policy,
             )
         )
 

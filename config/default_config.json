@@ -10,5 +10,9 @@
     "guest",
     "test"
   ],
-  "allowed_ips": []
+  "allowed_ips": [],
+  "severity_policy": {
+    "brute_force_suspected": "medium",
+    "suspicious_username_targeted": "low"
+  }
 }

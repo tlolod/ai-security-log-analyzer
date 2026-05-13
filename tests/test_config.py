@@ -22,6 +22,8 @@ def test_default_config_returns_expected_values() -> None:
     assert "root" in config.targeted_usernames
     assert "admin" in config.targeted_usernames
     assert config.allowed_ips == []
+    assert config.severity_policy["brute_force_suspected"] == "medium"
+    assert config.severity_policy["suspicious_username_targeted"] == "low"
 
 
 def test_load_config_none_returns_defaults() -> None:
@@ -31,6 +33,7 @@ def test_load_config_none_returns_defaults() -> None:
     assert config.failed_login_threshold == 5
     assert config.window_minutes == 10
     assert config.allowed_ips == []
+    assert config.severity_policy["brute_force_suspected"] == "medium"
 
 
 def test_load_config_reads_valid_json_file(tmp_path: Path) -> None:
@@ -42,7 +45,10 @@ def test_load_config_reads_valid_json_file(tmp_path: Path) -> None:
           "failed_login_threshold": 8,
           "window_minutes": 15,
           "targeted_usernames": ["Root", "Admin"],
-          "allowed_ips": ["203.0.113.10"]
+          "allowed_ips": ["203.0.113.10"],
+          "severity_policy": {
+            "brute_force_suspected": "High"
+          }
         }
         """,
     )
@@ -53,6 +59,8 @@ def test_load_config_reads_valid_json_file(tmp_path: Path) -> None:
     assert config.window_minutes == 15
     assert config.targeted_usernames == ["root", "admin"]
     assert config.allowed_ips == ["203.0.113.10"]
+    assert config.severity_policy["brute_force_suspected"] == "high"
+    assert config.severity_policy["suspicious_username_targeted"] == "low"
 
 
 def test_load_config_uses_defaults_for_missing_keys(tmp_path: Path) -> None:
@@ -68,6 +76,7 @@ def test_load_config_uses_defaults_for_missing_keys(tmp_path: Path) -> None:
     assert config.window_minutes == 10
     assert "root" in config.targeted_usernames
     assert config.allowed_ips == []
+    assert config.severity_policy["suspicious_username_targeted"] == "low"
 
 
 def test_load_config_rejects_invalid_json(tmp_path: Path) -> None:
@@ -149,6 +158,75 @@ def test_load_config_rejects_invalid_allowed_ip(tmp_path: Path) -> None:
     config_path = write_config_file(
         tmp_path / "config.json",
         '{"allowed_ips": ["not-an-ip"]}',
+    )
+
+    with pytest.raises(ValueError):
+        load_config(str(config_path))
+
+
+def test_load_config_reads_partial_severity_policy_override(tmp_path: Path) -> None:
+    """Severity policy can override one alert type while preserving defaults."""
+    config_path = write_config_file(
+        tmp_path / "config.json",
+        '{"severity_policy": {"brute_force_suspected": "high"}}',
+    )
+
+    config = load_config(str(config_path))
+
+    assert config.severity_policy["brute_force_suspected"] == "high"
+    assert config.severity_policy["suspicious_username_targeted"] == "low"
+
+
+def test_load_config_normalizes_severity_values(tmp_path: Path) -> None:
+    """Severity values should be normalized to lowercase."""
+    config_path = write_config_file(
+        tmp_path / "config.json",
+        '{"severity_policy": {"suspicious_username_targeted": "MEDIUM"}}',
+    )
+
+    config = load_config(str(config_path))
+
+    assert config.severity_policy["suspicious_username_targeted"] == "medium"
+
+
+def test_load_config_rejects_non_dict_severity_policy(tmp_path: Path) -> None:
+    """severity_policy must be a JSON object."""
+    config_path = write_config_file(
+        tmp_path / "config.json",
+        '{"severity_policy": "high"}',
+    )
+
+    with pytest.raises(ValueError):
+        load_config(str(config_path))
+
+
+def test_load_config_rejects_unknown_severity_policy_key(tmp_path: Path) -> None:
+    """Only known alert types may appear in severity_policy."""
+    config_path = write_config_file(
+        tmp_path / "config.json",
+        '{"severity_policy": {"unknown_alert": "low"}}',
+    )
+
+    with pytest.raises(ValueError):
+        load_config(str(config_path))
+
+
+def test_load_config_rejects_non_string_severity_value(tmp_path: Path) -> None:
+    """Severity policy values must be strings."""
+    config_path = write_config_file(
+        tmp_path / "config.json",
+        '{"severity_policy": {"brute_force_suspected": 123}}',
+    )
+
+    with pytest.raises(ValueError):
+        load_config(str(config_path))
+
+
+def test_load_config_rejects_invalid_severity_value(tmp_path: Path) -> None:
+    """Severity values must come from the approved severity set."""
+    config_path = write_config_file(
+        tmp_path / "config.json",
+        '{"severity_policy": {"brute_force_suspected": "severe"}}',
     )
 
     with pytest.raises(ValueError):

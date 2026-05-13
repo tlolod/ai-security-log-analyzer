@@ -15,6 +15,7 @@ def detect_failed_login_bursts(
     threshold: int,
     window_minutes: int,
     allowed_ips: list[str],
+    severity_policy: dict[str, str],
 ) -> list[Alert]:
     """Detect repeated failed logins from the same source IP address.
 
@@ -62,7 +63,7 @@ def detect_failed_login_bursts(
                 alerts.append(
                     Alert(
                         alert_type="brute_force_suspected",
-                        severity="medium",
+                        severity=severity_policy["brute_force_suspected"],
                         message=(
                             f"Detected {failed_count} failed login attempts from "
                             f"{source_ip} within {window_minutes} minutes."
@@ -89,6 +90,7 @@ def detect_suspicious_usernames(
     events: list[LogEvent],
     targeted_usernames: list[str],
     allowed_ips: list[str],
+    severity_policy: dict[str, str],
 ) -> list[Alert]:
     """Detect failed logins targeting commonly attacked usernames.
 
@@ -117,7 +119,7 @@ def detect_suspicious_usernames(
         alerts.append(
             Alert(
                 alert_type="suspicious_username_targeted",
-                severity="low",
+                severity=severity_policy["suspicious_username_targeted"],
                 message=(
                     "Failed login attempt targeted commonly attacked username "
                     f"'{username}' from {event.source_ip}."
