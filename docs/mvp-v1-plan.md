@@ -7,9 +7,10 @@ The goal of MVP v1 is to build a small, understandable cybersecurity log analysi
 MVP v1 should be able to:
 
 - Load a local log file.
-- Parse simple SSH authentication failure log lines.
+- Parse simple SSH authentication failure and success log lines.
 - Detect repeated failed-login patterns.
 - Detect failed logins against commonly attacked usernames.
+- Detect successful SSH logins after repeated failures from the same source IP.
 - Support a small JSON configuration system.
 - Suppress alerts from known allowed IP addresses.
 - Print structured alerts to the terminal.
@@ -29,8 +30,10 @@ Implemented capabilities include:
 - Python 3.12 project structure
 - SSH authentication log parsing
 - Failed-login event extraction
+- Successful-login event extraction
 - Brute-force detection rule
 - Suspicious username detection rule
+- Successful-login-after-failures detection rule
 - IP allowlist suppression
 - JSON configuration system
 - Configurable severity policy
@@ -100,7 +103,7 @@ Status: complete.
 
 Status: complete.
 
-`parser.py` parses common Linux SSH failed-login lines into `LogEvent` objects and safely skips unsupported lines.
+`parser.py` parses common Linux SSH failed-login and successful-login lines into `LogEvent` objects and safely skips unsupported lines.
 
 ### Milestone 5: Detection
 
@@ -112,8 +115,9 @@ Implemented detection rules:
 | --- | --- | --- |
 | `AUTH-001` | `brute_force_suspected` | Repeated failed logins from one source IP within a time window |
 | `AUTH-002` | `suspicious_username_targeted` | Failed login against a commonly attacked username |
+| `AUTH-003` | `successful_login_after_failures` | Successful SSH login after repeated failures from the same source IP |
 
-Both rules support allowed IP suppression and configurable severity policy.
+All rules support allowed IP suppression and configurable severity policy.
 
 ### Milestone 6: Output Formatting
 
@@ -165,8 +169,10 @@ MVP v1 is successful when:
 
 - A local sample log file can be analyzed.
 - Failed login lines are parsed into structured events.
+- Successful login lines are parsed into structured events.
 - Repeated failures from the same IP generate a brute-force alert.
 - Failed logins against targeted usernames generate suspicious-username alerts.
+- A successful login after repeated failures from the same IP generates a successful-after-failures alert.
 - Alerts include useful details such as source IP, count, time range, evidence, severity, and rule metadata.
 - Allowed IPs suppress supported alerts.
 - Config files are validated clearly and safely.

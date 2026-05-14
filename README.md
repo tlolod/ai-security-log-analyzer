@@ -7,7 +7,7 @@ A beginner-friendly Python cybersecurity project for parsing authentication logs
 
 ## Project Overview
 
-AI Security Log Analyzer is a learning-focused cybersecurity tool built with Python. The current system reads local authentication log files, parses common Linux SSH failed-login lines, applies deterministic detection rules, and prints structured alerts with summary statistics.
+AI Security Log Analyzer is a learning-focused cybersecurity tool built with Python. The current system reads local authentication log files, parses common Linux SSH login lines, applies deterministic detection rules, and prints structured alerts with summary statistics.
 
 The goal is not to build a full SIEM or production security platform. Instead, this project focuses on the fundamentals of log analysis, detection engineering, secure coding, clean software architecture, and reliable development workflows.
 
@@ -16,10 +16,11 @@ The goal is not to build a full SIEM or production security platform. Instead, t
 The current MVP can:
 
 - Load local log files safely
-- Parse common Linux SSH failed-login log lines
+- Parse common Linux SSH failed-login and successful-login log lines
 - Extract timestamps, usernames, source IP addresses, event types, and raw log lines
 - Detect repeated failed logins from the same IP address within a configurable time window
 - Detect failed logins targeting commonly attacked usernames
+- Detect a successful SSH login after repeated failed logins from the same source IP
 - Suppress alerts from configured allowed IP addresses
 - Load and validate JSON configuration files
 - Configure failed-login thresholds, detection windows, targeted usernames, allowed IPs, and severity policy
@@ -38,6 +39,7 @@ MVP v1 intentionally keeps the scope small so the architecture stays easy to und
 | --- | --- | --- | --- | --- |
 | `AUTH-001` | `brute_force_suspected` | SSH Brute Force Suspected | Detects repeated failed logins from one source IP within a time window | `medium` |
 | `AUTH-002` | `suspicious_username_targeted` | Suspicious Username Targeted | Detects failed logins against commonly attacked usernames such as `root` or `admin` | `low` |
+| `AUTH-003` | `successful_login_after_failures` | Successful SSH Login After Failures | Detects a successful SSH login after repeated failed logins from the same source IP | `high` |
 
 Alerts include stable rule metadata:
 
@@ -162,8 +164,8 @@ Supported config keys:
 
 | Key | Purpose |
 | --- | --- |
-| `failed_login_threshold` | Number of failed logins needed for a brute-force alert |
-| `window_minutes` | Time window used by the brute-force detector |
+| `failed_login_threshold` | Number of failed logins needed for failed-login-based alerts |
+| `window_minutes` | Time window used by failed-login-based detectors |
 | `targeted_usernames` | Usernames that trigger suspicious-username alerts |
 | `allowed_ips` | Exact IP addresses that should be suppressed from alerts |
 | `severity_policy` | Severity labels for known alert types |

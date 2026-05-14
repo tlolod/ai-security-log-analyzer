@@ -7,9 +7,9 @@ AI Security Log Analyzer is a beginner-friendly cybersecurity learning project. 
 The current MVP focuses on a simple but realistic workflow:
 
 1. Load local security log files.
-2. Parse basic SSH authentication failure events.
+2. Parse basic SSH authentication events.
 3. Load validated runtime configuration.
-4. Detect suspicious failed-login patterns.
+4. Detect suspicious failed-login and successful-after-failures patterns.
 5. Print structured alerts and summary statistics.
 6. Optionally export alerts to JSON.
 7. Keep the system easy to understand, test, and extend.
@@ -59,7 +59,7 @@ The current data flow is:
 2. `config.py` loads default settings or validates a JSON config file.
 3. CLI values for `--threshold` and `--window` override config-file values when provided.
 4. `loader.py` validates the local log path and reads raw text lines.
-5. `parser.py` converts recognized SSH failed-login lines into structured `LogEvent` objects.
+5. `parser.py` converts recognized SSH failed-login and successful-login lines into structured `LogEvent` objects.
 6. `detector.py` applies detection rules to the parsed events.
 7. Configured allowed IPs are suppressed from supported alerts.
 8. `formatter.py` converts alerts into readable JSON-style console output.
@@ -129,7 +129,7 @@ Responsible for converting raw log lines into normalized events.
 
 It should:
 
-- Look for known SSH authentication failure patterns.
+- Look for known SSH authentication failure and success patterns.
 - Extract fields such as timestamp, username, source IP, and event type.
 - Return `LogEvent` objects for recognized lines.
 - Skip unsupported or irrelevant lines safely.
@@ -146,6 +146,7 @@ Current rules:
 | --- | --- | --- | --- | --- |
 | `AUTH-001` | `brute_force_suspected` | SSH Brute Force Suspected | `1.0` | Detect repeated failed logins from one IP within a configured time window |
 | `AUTH-002` | `suspicious_username_targeted` | Suspicious Username Targeted | `1.0` | Detect failed logins targeting commonly attacked usernames |
+| `AUTH-003` | `successful_login_after_failures` | Successful SSH Login After Failures | `1.0` | Detect a successful SSH login after repeated failed logins from the same source IP |
 
 The detector should:
 
@@ -215,6 +216,7 @@ The current detector supports:
 
 - Brute-force detection using a failed-login threshold and time window.
 - Suspicious username detection for commonly attacked usernames.
+- Successful-login-after-failures detection using the same failed-login threshold and time window.
 - Exact IP allowlist suppression through `allowed_ips`.
 - Configurable severity labels through `severity_policy`.
 - Stable rule metadata for every alert.
