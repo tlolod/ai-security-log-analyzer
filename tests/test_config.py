@@ -167,6 +167,30 @@ def test_load_config_rejects_invalid_allowed_ip(tmp_path: Path) -> None:
         load_config(str(config_path))
 
 
+def test_load_config_accepts_ipv6_allowed_ip(tmp_path: Path) -> None:
+    """allowed_ips should support IPv6 address strings."""
+    config_path = write_config_file(
+        tmp_path / "config.json",
+        '{"allowed_ips": ["2001:db8::10"]}',
+    )
+
+    config = load_config(str(config_path))
+
+    assert config.allowed_ips == ["2001:db8::10"]
+
+
+def test_load_config_normalizes_ipv6_allowed_ip(tmp_path: Path) -> None:
+    """IPv6 allowlist entries should be normalized for string matching."""
+    config_path = write_config_file(
+        tmp_path / "config.json",
+        '{"allowed_ips": ["2001:0db8:0000:0000:0000:0000:0000:0010"]}',
+    )
+
+    config = load_config(str(config_path))
+
+    assert config.allowed_ips == ["2001:db8::10"]
+
+
 def test_load_config_reads_partial_severity_policy_override(tmp_path: Path) -> None:
     """Severity policy can override one alert type while preserving defaults."""
     config_path = write_config_file(

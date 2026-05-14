@@ -5,10 +5,14 @@ It does not decide whether activity is suspicious; that belongs to the
 detector layer.
 """
 
+import ipaddress
 import re
 from datetime import datetime
 
 from .models import LogEvent
+
+
+SOURCE_IP_PATTERN = r"(?P<source_ip>\S+)"
 
 
 # Common Linux SSH failed-login examples include lines like:
@@ -26,7 +30,7 @@ FAILED_LOGIN_PATTERN = re.compile(
     r"(?:invalid user )?"
     r"(?P<username>\S+) "
     r"from "
-    r"(?P<source_ip>\d{1,3}(?:\.\d{1,3}){3})"
+    + SOURCE_IP_PATTERN
 )
 
 # Successful SSH logins often look like:
@@ -42,7 +46,7 @@ ACCEPTED_LOGIN_PATTERN = re.compile(
     r".*Accepted password for "
     r"(?P<username>\S+) "
     r"from "
-    r"(?P<source_ip>\d{1,3}(?:\.\d{1,3}){3})"
+    + SOURCE_IP_PATTERN
 )
 
 
@@ -67,8 +71,11 @@ def parse_auth_line(line: str, year: int) -> LogEvent | None:
     return None
 
 
-def _build_log_event(match: re.Match[str], year: int, event_type: str, line: str) -> LogEvent:
+def _build_log_event(match: re.Match[str], year: int, event_type: str, line: str) -> LogEvent | None:
     """Build a LogEvent from a regex match with syslog timestamp fields."""
+    source_ip = _normalize_ip_address(match.group("source_ip"))
+    if source_ip is None:
+        return None
 
     timestamp_text = (
         f"{match.group('month')} "
@@ -80,11 +87,19 @@ def _build_log_event(match: re.Match[str], year: int, event_type: str, line: str
 
     return LogEvent(
         timestamp=timestamp,
-        source_ip=match.group("source_ip"),
+        source_ip=source_ip,
         username=match.group("username"),
         event_type=event_type,
         raw_line=line,
     )
+
+
+def _normalize_ip_address(ip_text: str) -> str | None:
+    """Validate and normalize an IPv4 or IPv6 address from a log line."""
+    try:
+        return str(ipaddress.ip_address(ip_text))
+    except ValueError:
+        return None
 
 
 def parse_lines(lines: list[str], year: int) -> tuple[list[LogEvent], int]:

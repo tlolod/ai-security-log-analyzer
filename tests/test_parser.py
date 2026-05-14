@@ -56,6 +56,77 @@ def test_parse_auth_line_successful_login() -> None:
     assert event.raw_line == line
 
 
+def test_parse_auth_line_failed_login_ipv6_invalid_user() -> None:
+    """Parser should handle IPv6 source addresses for invalid-user failures."""
+    line = (
+        "May 11 22:01:01 server sshd[1301]: Failed password for invalid user "
+        "admin from 2001:db8::10 port 54231 ssh2"
+    )
+
+    event = parse_auth_line(line, year=2026)
+
+    assert event is not None
+    assert event.timestamp == datetime(2026, 5, 11, 22, 1, 1)
+    assert event.source_ip == "2001:db8::10"
+    assert event.username == "admin"
+    assert event.event_type == "failed_login"
+
+
+def test_parse_auth_line_failed_login_ipv6_normal_user() -> None:
+    """Parser should handle IPv6 source addresses for normal-user failures."""
+    line = (
+        "May 11 22:01:30 server sshd[1302]: Failed password for root "
+        "from 2001:db8::20 port 54232 ssh2"
+    )
+
+    event = parse_auth_line(line, year=2026)
+
+    assert event is not None
+    assert event.source_ip == "2001:db8::20"
+    assert event.username == "root"
+    assert event.event_type == "failed_login"
+
+
+def test_parse_auth_line_successful_login_ipv6() -> None:
+    """Parser should handle IPv6 source addresses for successful logins."""
+    line = (
+        "May 11 22:02:00 server sshd[1303]: Accepted password for alice "
+        "from 2001:db8::10 port 54233 ssh2"
+    )
+
+    event = parse_auth_line(line, year=2026)
+
+    assert event is not None
+    assert event.source_ip == "2001:db8::10"
+    assert event.username == "alice"
+    assert event.event_type == "successful_login"
+
+
+def test_parse_auth_line_normalizes_ipv6_address() -> None:
+    """Parser should normalize IPv6 text the same way config allowlists do."""
+    line = (
+        "May 11 22:02:00 server sshd[1303]: Accepted password for alice "
+        "from 2001:0db8:0000:0000:0000:0000:0000:0010 port 54233 ssh2"
+    )
+
+    event = parse_auth_line(line, year=2026)
+
+    assert event is not None
+    assert event.source_ip == "2001:db8::10"
+
+
+def test_parse_auth_line_returns_none_for_invalid_source_ip() -> None:
+    """Invalid source IP values should be skipped safely."""
+    line = (
+        "May 11 22:02:00 server sshd[1303]: Accepted password for alice "
+        "from not-an-ip port 54233 ssh2"
+    )
+
+    event = parse_auth_line(line, year=2026)
+
+    assert event is None
+
+
 def test_parse_auth_line_returns_none_for_unrelated_line() -> None:
     """Unrelated log lines should be skipped instead of becoming events."""
     line = "May 11 21:30:01 server CRON[1200]: session opened for user root"

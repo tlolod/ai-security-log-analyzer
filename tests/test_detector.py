@@ -150,6 +150,26 @@ def test_detect_failed_login_bursts_groups_by_source_ip() -> None:
     assert alerts[0].source_ip == "203.0.113.10"
 
 
+def test_detect_failed_login_bursts_supports_ipv6_source_ip() -> None:
+    """Brute-force detection should work with IPv6 source IP strings."""
+    start_time = datetime(2026, 5, 11, 22, 0, 0)
+    events = [
+        make_log_event(start_time + timedelta(minutes=minute), "2001:db8::10")
+        for minute in range(5)
+    ]
+
+    alerts = detect_failed_login_bursts(
+        events,
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=[],
+        severity_policy=SEVERITY_POLICY,
+    )
+
+    assert len(alerts) == 1
+    assert alerts[0].source_ip == "2001:db8::10"
+
+
 def test_detect_suspicious_usernames_creates_alert_for_targeted_username() -> None:
     """A failed login to root should create a low-severity alert."""
     event = make_log_event(
@@ -247,6 +267,20 @@ def test_detect_suspicious_usernames_alerts_per_unique_ip_username_pair() -> Non
     assert any(ip == "198.51.100.77" and "admin" in message for ip, message in alert_pairs)
 
 
+def test_detect_suspicious_usernames_supports_ipv6_source_ip() -> None:
+    """Suspicious-username detection should work with IPv6 source IP strings."""
+    event = make_log_event(
+        datetime(2026, 5, 11, 22, 0, 0),
+        "2001:db8::10",
+        username="root",
+    )
+
+    alerts = detect_suspicious_usernames([event], TARGETED_USERNAMES, NO_ALLOWED_IPS, SEVERITY_POLICY)
+
+    assert len(alerts) == 1
+    assert alerts[0].source_ip == "2001:db8::10"
+
+
 def test_detect_failed_login_bursts_ignores_allowed_ip() -> None:
     """Allowlisted IPs should not generate brute-force alerts."""
     start_time = datetime(2026, 5, 11, 21, 33, 0)
@@ -302,6 +336,25 @@ def test_allowed_ips_do_not_suppress_other_ips() -> None:
 
     assert len(alerts) == 1
     assert alerts[0].source_ip == "203.0.113.10"
+
+
+def test_detect_failed_login_bursts_ignores_allowed_ipv6() -> None:
+    """IPv6 allowlisted IPs should suppress brute-force alerts."""
+    start_time = datetime(2026, 5, 11, 22, 0, 0)
+    events = [
+        make_log_event(start_time + timedelta(minutes=minute), "2001:db8::10")
+        for minute in range(5)
+    ]
+
+    alerts = detect_failed_login_bursts(
+        events,
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=["2001:db8::10"],
+        severity_policy=SEVERITY_POLICY,
+    )
+
+    assert alerts == []
 
 
 def test_detect_failed_login_bursts_uses_configured_severity() -> None:
@@ -389,6 +442,33 @@ def test_detect_successful_login_after_failures_creates_alert() -> None:
     assert "alice" in alert.message
     assert len(alert.evidence) == 4
     assert alert.evidence[-1] == success_event.raw_line
+
+
+def test_detect_successful_login_after_failures_supports_ipv6_source_ip() -> None:
+    """Successful-after-failures detection should work with IPv6 source IP strings."""
+    start_time = datetime(2026, 5, 11, 22, 0, 0)
+    failed_events = [
+        make_log_event(start_time + timedelta(minutes=minute), "2001:db8::10")
+        for minute in range(5)
+    ]
+    success_event = make_log_event(
+        start_time + timedelta(minutes=6),
+        "2001:db8::10",
+        event_type="successful_login",
+        username="alice",
+    )
+
+    alerts = detect_successful_login_after_failures(
+        failed_events + [success_event],
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=[],
+        severity_policy=SEVERITY_POLICY,
+    )
+
+    assert len(alerts) == 1
+    assert alerts[0].source_ip == "2001:db8::10"
+    assert "2001:db8::10" in alerts[0].message
 
 
 def test_detect_successful_login_after_failures_no_alert_below_threshold() -> None:
