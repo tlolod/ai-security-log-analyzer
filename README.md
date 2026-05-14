@@ -2,54 +2,84 @@
 
 A beginner-friendly Python cybersecurity project for parsing authentication logs, detecting suspicious failed-login patterns, and learning secure AI-assisted development workflows.
 
-**Status:** MVP v1 in progress  
-**Focus:** Python 3.12, cybersecurity log analysis, Docker Dev Containers, and safe AI-assisted development
+**Status:** MVP v1 functional learning foundation  
+**Focus:** Python 3.12, cybersecurity log analysis, Docker Dev Containers, pytest, GitHub Actions, and safe AI-assisted development
 
 ## Project Overview
 
-AI Security Log Analyzer is a learning-focused cybersecurity tool built with Python. The current MVP reads local authentication log files, parses common Linux SSH failed-login lines, detects repeated failures from the same source IP address, and prints structured alerts.
+AI Security Log Analyzer is a learning-focused cybersecurity tool built with Python. The current system reads local authentication log files, parses common Linux SSH failed-login lines, applies deterministic detection rules, and prints structured alerts with summary statistics.
 
-The goal is not to build a full SIEM or production security platform. Instead, this project focuses on the fundamentals of log analysis, detection engineering, secure coding, and clean software architecture.
+The goal is not to build a full SIEM or production security platform. Instead, this project focuses on the fundamentals of log analysis, detection engineering, secure coding, clean software architecture, and reliable development workflows.
 
-## Current MVP Capabilities
+## Current Implemented Capabilities
 
 The current MVP can:
 
-- Load local log files
+- Load local log files safely
 - Parse common Linux SSH failed-login log lines
 - Extract timestamps, usernames, source IP addresses, event types, and raw log lines
 - Detect repeated failed logins from the same IP address within a configurable time window
-- Print structured JSON-style alerts
-- Print a simple run summary
-- Use a sanitized sample authentication log for testing
+- Detect failed logins targeting commonly attacked usernames
+- Suppress alerts from configured allowed IP addresses
+- Load and validate JSON configuration files
+- Configure failed-login thresholds, detection windows, targeted usernames, allowed IPs, and severity policy
+- Include detection rule metadata in alerts
+- Print structured JSON-style alerts to the console
+- Print alert summary statistics by alert type, severity, and unique source IP count
+- Export alerts and summaries to JSON files
+- Run a pytest unit test suite
+- Run tests automatically in GitHub Actions CI on push and pull request
 
-MVP v1 intentionally focuses on one detection rule so the architecture stays easy to understand.
+MVP v1 intentionally keeps the scope small so the architecture stays easy to understand.
+
+## Detection Rules
+
+| Rule ID | Alert Type | Rule Name | Purpose | Default Severity |
+| --- | --- | --- | --- | --- |
+| `AUTH-001` | `brute_force_suspected` | SSH Brute Force Suspected | Detects repeated failed logins from one source IP within a time window | `medium` |
+| `AUTH-002` | `suspicious_username_targeted` | Suspicious Username Targeted | Detects failed logins against commonly attacked usernames such as `root` or `admin` | `low` |
+
+Alerts include stable rule metadata:
+
+- `rule_id`
+- `rule_name`
+- `rule_version`
+- `alert_type`
+- `severity`
+
+This metadata makes alerts easier to understand, test, export, and extend later.
 
 ## High-Level Architecture
 
 The project follows a simple layered pipeline:
 
 ```text
-Loader -> Parser -> Detector -> Formatter
+Config + CLI -> Loader -> Parser -> Detector -> Formatter
 ```
 
 Each layer has one clear responsibility:
 
 | Layer | Module | Responsibility |
 | --- | --- | --- |
+| Config | `config.py` | Loads defaults or validates JSON configuration |
 | Loader | `loader.py` | Reads local log files safely |
 | Parser | `parser.py` | Converts raw log lines into `LogEvent` objects |
 | Detector | `detector.py` | Applies detection rules to parsed events |
-| Formatter | `formatter.py` | Prints alerts and run summaries |
+| Formatter | `formatter.py` | Prints alerts, summaries, and JSON export data |
 | Models | `models.py` | Defines shared dataclasses |
-| CLI | `main.py` | Connects the pipeline through command-line arguments |
+| CLI | `main.py` | Orchestrates the pipeline through command-line arguments |
 
-Raw log lines are treated as untrusted input. The tool reads them as text, parses only known patterns, skips unsupported lines, and never executes log content.
+Raw log lines and configuration files are treated as untrusted input. The tool reads them as text, validates expected fields, parses only known log patterns, skips unsupported lines, and never executes log content.
 
 ## Project Structure
 
 ```text
 ai-security-log-analyzer/
+├── .github/
+│   └── workflows/
+│       └── tests.yml
+├── config/
+│   └── default_config.json
 ├── docs/
 │   ├── architecture.md
 │   ├── dev-notes.md
@@ -58,14 +88,21 @@ ai-security-log-analyzer/
 │   └── auth_sample.log
 ├── src/
 │   └── log_analyzer/
+│       ├── config.py
 │       ├── detector.py
 │       ├── formatter.py
 │       ├── loader.py
 │       ├── main.py
 │       ├── models.py
 │       └── parser.py
+├── tests/
+│   ├── test_config.py
+│   ├── test_detector.py
+│   ├── test_formatter.py
+│   └── test_parser.py
 ├── AGENTS.md
 ├── README.md
+├── requirements-dev.txt
 └── .gitignore
 ```
 
@@ -80,7 +117,15 @@ ai-security-log-analyzer/
 
 ### Dependencies
 
-MVP v1 currently uses only the Python standard library. No package installation is required.
+The analyzer itself currently uses the Python standard library.
+
+For development and testing, install the development dependencies:
+
+```bash
+python -m pip install -r requirements-dev.txt
+```
+
+`pytest` is currently the only development dependency.
 
 ### Clone the Repository
 
@@ -98,13 +143,38 @@ Recommended workflow:
 1. Open the repository in VS Code.
 2. Install the Dev Containers extension if needed.
 3. Reopen the project in the container.
-4. Develop and run the analyzer from inside the container terminal.
+4. Install development dependencies if needed.
+5. Develop and run tests from inside the container terminal.
 
 Using a Dev Container is especially useful for cybersecurity learning projects because it supports reproducible and isolated development.
 
+## Configuration
+
+The analyzer can use built-in defaults or load a JSON configuration file.
+
+Default configuration lives in:
+
+```text
+config/default_config.json
+```
+
+Supported config keys:
+
+| Key | Purpose |
+| --- | --- |
+| `failed_login_threshold` | Number of failed logins needed for a brute-force alert |
+| `window_minutes` | Time window used by the brute-force detector |
+| `targeted_usernames` | Usernames that trigger suspicious-username alerts |
+| `allowed_ips` | Exact IP addresses that should be suppressed from alerts |
+| `severity_policy` | Severity labels for known alert types |
+
+Configuration is validated before use. Unknown keys, invalid JSON, invalid IP addresses, invalid severity values, and wrong value types fail clearly.
+
+CLI values for `--threshold` and `--window` override config-file values so short experiments remain easy.
+
 ## Example Usage
 
-Analyze the included sample log:
+Analyze the included sample log with built-in defaults:
 
 ```bash
 PYTHONPATH=src python -m log_analyzer.main --file sample_logs/auth_sample.log --year 2026
@@ -120,6 +190,25 @@ PYTHONPATH=src python -m log_analyzer.main \
   --year 2026
 ```
 
+Use a JSON config file:
+
+```bash
+PYTHONPATH=src python -m log_analyzer.main \
+  --file sample_logs/auth_sample.log \
+  --config config/default_config.json \
+  --year 2026
+```
+
+Export alerts to a JSON file:
+
+```bash
+PYTHONPATH=src python -m log_analyzer.main \
+  --file sample_logs/auth_sample.log \
+  --config config/default_config.json \
+  --output alerts.json \
+  --year 2026
+```
+
 ## Example Output
 
 Example alert output:
@@ -128,6 +217,9 @@ Example alert output:
 === ALERTS ===
 {
   "alert_type": "brute_force_suspected",
+  "rule_id": "AUTH-001",
+  "rule_name": "SSH Brute Force Suspected",
+  "rule_version": "1.0",
   "severity": "medium",
   "message": "Detected 5 failed login attempts from 203.0.113.10 within 10 minutes.",
   "source_ip": "203.0.113.10",
@@ -135,11 +227,19 @@ Example alert output:
   "last_seen": "2026-05-11T21:37:55",
   "failed_count": 5,
   "evidence": [
-    "May 11 21:33:01 server sshd[1234]: Failed password for invalid user admin from 203.0.113.10 port 54231 ssh2",
-    "May 11 21:34:12 server sshd[1235]: Failed password for invalid user admin from 203.0.113.10 port 54232 ssh2",
-    "May 11 21:35:25 server sshd[1236]: Failed password for invalid user admin from 203.0.113.10 port 54233 ssh2"
+    "May 11 21:33:01 server sshd[1234]: Failed password for invalid user admin from 203.0.113.10 port 54231 ssh2"
   ]
 }
+=== ALERT SUMMARY ===
+
+Alerts by type:
+- brute_force_suspected: 1
+
+Alerts by severity:
+- medium: 1
+
+Unique source IPs:
+- 1
 === RUN SUMMARY ===
 Total lines: 11
 Parsed events: 7
@@ -147,11 +247,76 @@ Skipped lines: 4
 Alerts generated: 1
 ```
 
-Output may vary slightly as detection rules evolve.
+Output may vary as sample data and detection rules evolve.
+
+## JSON Export
+
+When `--output` is provided, the formatter writes a JSON file with this structure:
+
+```json
+{
+  "alerts": [],
+  "alert_count": 0,
+  "summary": {
+    "by_type": {},
+    "by_severity": {},
+    "unique_source_ips": 0
+  }
+}
+```
+
+The same alert fields printed to the console are included in exported alerts.
+
+## Testing
+
+Install test dependencies:
+
+```bash
+python -m pip install -r requirements-dev.txt
+```
+
+Run the test suite:
+
+```bash
+PYTHONPATH=src python -m pytest
+```
+
+Current tests cover:
+
+- Parser behavior
+- Detector behavior
+- Config loading and validation
+- Formatter behavior, alert summaries, and JSON export
+
+## Continuous Integration
+
+GitHub Actions runs the test suite on:
+
+- `push`
+- `pull_request`
+
+The CI workflow uses Python 3.12, installs `requirements-dev.txt`, and runs:
+
+```bash
+PYTHONPATH=src python -m pytest
+```
+
+## Feature Branch Workflow
+
+Recommended workflow for contributors:
+
+1. Create a focused feature branch.
+2. Keep changes small and easy to review.
+3. Preserve the layered architecture.
+4. Add or update tests for behavior changes.
+5. Update documentation when CLI flags, config keys, alert schema, or detection rules change.
+6. Run pytest locally before opening a pull request.
+7. Push the branch and open a pull request.
+8. Let GitHub Actions confirm the test suite passes before merging.
 
 ## Security Notes
 
-This project treats log data as untrusted input.
+This project treats log data and config data as untrusted input.
 
 Safety principles:
 
@@ -159,8 +324,10 @@ Safety principles:
 - Never pass raw log content into shell commands
 - Parse only known patterns
 - Skip unsupported lines safely
+- Validate config values before use
 - Use sanitized sample logs
 - Keep detection logic deterministic and explainable
+- Do not add automated blocking or remediation in MVP v1
 
 ## Learning Goals
 
@@ -171,24 +338,36 @@ This project is designed to practice:
 - File handling with `pathlib`
 - Regular-expression-based log parsing
 - Simple security detection rules
+- JSON configuration and validation
 - CLI design with `argparse`
+- Unit testing with pytest
+- GitHub Actions CI
 - Layered software architecture
 - Docker Dev Container workflow
 - Safe AI-assisted development practices
 
-## Roadmap
+## Recommended Next Milestones
 
-Planned or possible future improvements:
+Good next improvements:
 
-- Add unit tests for parser and detector behavior
-- Add JSON output mode
-- Add configuration file support for thresholds
-- Support more authentication log formats
-- Add more detection rules
-- Add structured error reporting
-- Add AI-generated alert summaries after MVP is stable
-- Add a small dashboard in a later version
-- Expand Dev Container configuration as needed
+- Add tests for `loader.py`
+- Add tests for `main.py` CLI orchestration and config override behavior
+- Document the alert JSON schema more formally
+- Add more sanitized sample logs for parser edge cases
+- Add a small release checklist or changelog
+- Consider simple linting or formatting guidance without adding unnecessary dependency complexity
+- Add more authentication log formats only after the current SSH parser remains well tested
+
+Still intentionally out of scope for MVP v1 unless explicitly requested:
+
+- AI summaries
+- Web dashboards
+- Databases
+- Real-time streaming
+- External API calls
+- SIEM integrations
+- Machine learning
+- Automated response actions
 
 ## Documentation
 
