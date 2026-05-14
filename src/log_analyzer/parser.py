@@ -29,6 +29,22 @@ FAILED_LOGIN_PATTERN = re.compile(
     r"(?P<source_ip>\d{1,3}(?:\.\d{1,3}){3})"
 )
 
+# Successful SSH logins often look like:
+#
+# May 11 21:40:01 server sshd[1236]: Accepted password for alice from 203.0.113.10 port 54233 ssh2
+#
+# This pattern intentionally supports the simple password-based success format
+# needed by the current detection rules.
+ACCEPTED_LOGIN_PATTERN = re.compile(
+    r"(?P<month>[A-Z][a-z]{2})\s+"
+    r"(?P<day>\d{1,2})\s+"
+    r"(?P<time>\d{2}:\d{2}:\d{2})"
+    r".*Accepted password for "
+    r"(?P<username>\S+) "
+    r"from "
+    r"(?P<source_ip>\d{1,3}(?:\.\d{1,3}){3})"
+)
+
 
 def parse_auth_line(line: str, year: int) -> LogEvent | None:
     """Parse one authentication log line.
@@ -40,9 +56,19 @@ def parse_auth_line(line: str, year: int) -> LogEvent | None:
     Returns:
         A ``LogEvent`` for recognized failed-login lines, otherwise ``None``.
     """
-    match = FAILED_LOGIN_PATTERN.search(line)
-    if match is None:
-        return None
+    failed_match = FAILED_LOGIN_PATTERN.search(line)
+    if failed_match is not None:
+        return _build_log_event(failed_match, year, "failed_login", line)
+
+    accepted_match = ACCEPTED_LOGIN_PATTERN.search(line)
+    if accepted_match is not None:
+        return _build_log_event(accepted_match, year, "successful_login", line)
+
+    return None
+
+
+def _build_log_event(match: re.Match[str], year: int, event_type: str, line: str) -> LogEvent:
+    """Build a LogEvent from a regex match with syslog timestamp fields."""
 
     timestamp_text = (
         f"{match.group('month')} "
@@ -56,7 +82,7 @@ def parse_auth_line(line: str, year: int) -> LogEvent | None:
         timestamp=timestamp,
         source_ip=match.group("source_ip"),
         username=match.group("username"),
-        event_type="failed_login",
+        event_type=event_type,
         raw_line=line,
     )
 

@@ -93,6 +93,7 @@ def test_build_alert_summary_counts_by_type() -> None:
         make_alert(alert_type="brute_force_suspected"),
         make_alert(alert_type="brute_force_suspected"),
         make_alert(alert_type="suspicious_username_targeted"),
+        make_alert(alert_type="successful_login_after_failures"),
     ]
 
     summary = build_alert_summary(alerts)
@@ -100,6 +101,7 @@ def test_build_alert_summary_counts_by_type() -> None:
     assert summary["by_type"] == {
         "brute_force_suspected": 2,
         "suspicious_username_targeted": 1,
+        "successful_login_after_failures": 1,
     }
 
 

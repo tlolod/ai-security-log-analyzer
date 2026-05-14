@@ -13,6 +13,7 @@
   "allowed_ips": [],
   "severity_policy": {
     "brute_force_suspected": "medium",
-    "suspicious_username_targeted": "low"
+    "suspicious_username_targeted": "low",
+    "successful_login_after_failures": "high"
   }
 }

@@ -24,6 +24,7 @@ def test_default_config_returns_expected_values() -> None:
     assert config.allowed_ips == []
     assert config.severity_policy["brute_force_suspected"] == "medium"
     assert config.severity_policy["suspicious_username_targeted"] == "low"
+    assert config.severity_policy["successful_login_after_failures"] == "high"
 
 
 def test_load_config_none_returns_defaults() -> None:
@@ -34,6 +35,7 @@ def test_load_config_none_returns_defaults() -> None:
     assert config.window_minutes == 10
     assert config.allowed_ips == []
     assert config.severity_policy["brute_force_suspected"] == "medium"
+    assert config.severity_policy["successful_login_after_failures"] == "high"
 
 
 def test_load_config_reads_valid_json_file(tmp_path: Path) -> None:
@@ -61,6 +63,7 @@ def test_load_config_reads_valid_json_file(tmp_path: Path) -> None:
     assert config.allowed_ips == ["203.0.113.10"]
     assert config.severity_policy["brute_force_suspected"] == "high"
     assert config.severity_policy["suspicious_username_targeted"] == "low"
+    assert config.severity_policy["successful_login_after_failures"] == "high"
 
 
 def test_load_config_uses_defaults_for_missing_keys(tmp_path: Path) -> None:
@@ -175,6 +178,19 @@ def test_load_config_reads_partial_severity_policy_override(tmp_path: Path) -> N
 
     assert config.severity_policy["brute_force_suspected"] == "high"
     assert config.severity_policy["suspicious_username_targeted"] == "low"
+    assert config.severity_policy["successful_login_after_failures"] == "high"
+
+
+def test_load_config_accepts_successful_after_failures_severity_override(tmp_path: Path) -> None:
+    """The new successful-login-after-failures alert type should be configurable."""
+    config_path = write_config_file(
+        tmp_path / "config.json",
+        '{"severity_policy": {"successful_login_after_failures": "critical"}}',
+    )
+
+    config = load_config(str(config_path))
+
+    assert config.severity_policy["successful_login_after_failures"] == "critical"
 
 
 def test_load_config_normalizes_severity_values(tmp_path: Path) -> None:

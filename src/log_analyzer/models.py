@@ -19,7 +19,8 @@ class LogEvent:
     """A normalized security event parsed from one raw log line.
 
     The parser will create this object when it recognizes a useful log line.
-    For MVP v1, the main event type will be something like ``"failed_login"``.
+    For MVP v1, common event types include ``"failed_login"`` and
+    ``"successful_login"``.
     """
 
     timestamp: datetime

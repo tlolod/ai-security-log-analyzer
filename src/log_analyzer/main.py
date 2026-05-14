@@ -11,7 +11,11 @@ import argparse
 from datetime import datetime
 
 from .config import load_config
-from .detector import detect_failed_login_bursts, detect_suspicious_usernames
+from .detector import (
+    detect_failed_login_bursts,
+    detect_successful_login_after_failures,
+    detect_suspicious_usernames,
+)
 from .formatter import (
     build_alert_summary,
     print_alert_summary,
@@ -80,6 +84,15 @@ def run(
             config.window_minutes,
             config.allowed_ips,
             config.severity_policy,
+        )
+        alerts.extend(
+            detect_successful_login_after_failures(
+                events,
+                config.failed_login_threshold,
+                config.window_minutes,
+                config.allowed_ips,
+                config.severity_policy,
+            )
         )
         alerts.extend(
             detect_suspicious_usernames(

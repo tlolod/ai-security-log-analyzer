@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 from src.log_analyzer.detector import (
     detect_failed_login_bursts,
+    detect_successful_login_after_failures,
     detect_suspicious_usernames,
 )
 from src.log_analyzer.models import LogEvent
@@ -14,6 +15,7 @@ NO_ALLOWED_IPS: list[str] = []
 SEVERITY_POLICY = {
     "brute_force_suspected": "medium",
     "suspicious_username_targeted": "low",
+    "successful_login_after_failures": "high",
 }
 
 
@@ -312,6 +314,7 @@ def test_detect_failed_login_bursts_uses_configured_severity() -> None:
     severity_policy = {
         "brute_force_suspected": "high",
         "suspicious_username_targeted": "low",
+        "successful_login_after_failures": "high",
     }
 
     alerts = detect_failed_login_bursts(
@@ -336,6 +339,7 @@ def test_detect_suspicious_usernames_uses_configured_severity() -> None:
     severity_policy = {
         "brute_force_suspected": "medium",
         "suspicious_username_targeted": "medium",
+        "successful_login_after_failures": "high",
     }
 
     alerts = detect_suspicious_usernames(
@@ -347,3 +351,225 @@ def test_detect_suspicious_usernames_uses_configured_severity() -> None:
 
     assert len(alerts) == 1
     assert alerts[0].severity == "medium"
+
+
+def test_detect_successful_login_after_failures_creates_alert() -> None:
+    """A success after enough failures from one IP should create an alert."""
+    start_time = datetime(2026, 5, 11, 21, 33, 0)
+    failed_events = [
+        make_log_event(start_time + timedelta(minutes=minute), "203.0.113.10")
+        for minute in range(5)
+    ]
+    success_event = make_log_event(
+        start_time + timedelta(minutes=6),
+        "203.0.113.10",
+        event_type="successful_login",
+        username="alice",
+    )
+
+    alerts = detect_successful_login_after_failures(
+        failed_events + [success_event],
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=[],
+        severity_policy=SEVERITY_POLICY,
+    )
+
+    assert len(alerts) == 1
+    alert = alerts[0]
+    assert alert.alert_type == "successful_login_after_failures"
+    assert alert.rule_id == "AUTH-003"
+    assert alert.rule_name == "Successful SSH Login After Failures"
+    assert alert.rule_version == "1.0"
+    assert alert.severity == "high"
+    assert alert.source_ip == "203.0.113.10"
+    assert alert.first_seen == start_time
+    assert alert.last_seen == success_event.timestamp
+    assert alert.failed_count == 5
+    assert "alice" in alert.message
+    assert len(alert.evidence) == 4
+    assert alert.evidence[-1] == success_event.raw_line
+
+
+def test_detect_successful_login_after_failures_no_alert_below_threshold() -> None:
+    """A success after too few failures should not alert."""
+    start_time = datetime(2026, 5, 11, 21, 33, 0)
+    failed_events = [
+        make_log_event(start_time + timedelta(minutes=minute), "203.0.113.10")
+        for minute in range(4)
+    ]
+    success_event = make_log_event(
+        start_time + timedelta(minutes=5),
+        "203.0.113.10",
+        event_type="successful_login",
+        username="alice",
+    )
+
+    alerts = detect_successful_login_after_failures(
+        failed_events + [success_event],
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=[],
+        severity_policy=SEVERITY_POLICY,
+    )
+
+    assert alerts == []
+
+
+def test_detect_successful_login_after_failures_no_alert_outside_window() -> None:
+    """Failures outside the configured window should not trigger the rule."""
+    start_time = datetime(2026, 5, 11, 21, 0, 0)
+    failed_events = [
+        make_log_event(start_time + timedelta(minutes=minute), "203.0.113.10")
+        for minute in range(5)
+    ]
+    success_event = make_log_event(
+        start_time + timedelta(minutes=20),
+        "203.0.113.10",
+        event_type="successful_login",
+        username="alice",
+    )
+
+    alerts = detect_successful_login_after_failures(
+        failed_events + [success_event],
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=[],
+        severity_policy=SEVERITY_POLICY,
+    )
+
+    assert alerts == []
+
+
+def test_detect_successful_login_after_failures_requires_failures_before_success() -> None:
+    """Failures must happen before the successful login, not after it."""
+    start_time = datetime(2026, 5, 11, 21, 33, 0)
+    success_event = make_log_event(
+        start_time,
+        "203.0.113.10",
+        event_type="successful_login",
+        username="alice",
+    )
+    failed_events = [
+        make_log_event(start_time + timedelta(minutes=minute), "203.0.113.10")
+        for minute in range(1, 6)
+    ]
+
+    alerts = detect_successful_login_after_failures(
+        [success_event] + failed_events,
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=[],
+        severity_policy=SEVERITY_POLICY,
+    )
+
+    assert alerts == []
+
+
+def test_detect_successful_login_after_failures_groups_by_source_ip() -> None:
+    """Failures from one IP should not count toward another IP's success."""
+    start_time = datetime(2026, 5, 11, 21, 33, 0)
+    failed_events = [
+        make_log_event(start_time + timedelta(minutes=minute), "203.0.113.10")
+        for minute in range(5)
+    ]
+    success_event = make_log_event(
+        start_time + timedelta(minutes=6),
+        "198.51.100.77",
+        event_type="successful_login",
+        username="alice",
+    )
+
+    alerts = detect_successful_login_after_failures(
+        failed_events + [success_event],
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=[],
+        severity_policy=SEVERITY_POLICY,
+    )
+
+    assert alerts == []
+
+
+def test_detect_successful_login_after_failures_ignores_allowed_ip() -> None:
+    """Allowlisted IPs should not generate successful-after-failures alerts."""
+    start_time = datetime(2026, 5, 11, 21, 33, 0)
+    failed_events = [
+        make_log_event(start_time + timedelta(minutes=minute), "203.0.113.10")
+        for minute in range(5)
+    ]
+    success_event = make_log_event(
+        start_time + timedelta(minutes=6),
+        "203.0.113.10",
+        event_type="successful_login",
+        username="alice",
+    )
+
+    alerts = detect_successful_login_after_failures(
+        failed_events + [success_event],
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=["203.0.113.10"],
+        severity_policy=SEVERITY_POLICY,
+    )
+
+    assert alerts == []
+
+
+def test_detect_successful_login_after_failures_uses_configured_severity() -> None:
+    """Successful-after-failures alerts should use severity from config."""
+    start_time = datetime(2026, 5, 11, 21, 33, 0)
+    failed_events = [
+        make_log_event(start_time + timedelta(minutes=minute), "203.0.113.10")
+        for minute in range(5)
+    ]
+    success_event = make_log_event(
+        start_time + timedelta(minutes=6),
+        "203.0.113.10",
+        event_type="successful_login",
+        username="alice",
+    )
+    severity_policy = {
+        "brute_force_suspected": "medium",
+        "suspicious_username_targeted": "low",
+        "successful_login_after_failures": "critical",
+    }
+
+    alerts = detect_successful_login_after_failures(
+        failed_events + [success_event],
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=[],
+        severity_policy=severity_policy,
+    )
+
+    assert len(alerts) == 1
+    assert alerts[0].severity == "critical"
+
+
+def test_detect_successful_login_after_failures_alerts_once_per_ip() -> None:
+    """Repeated matching successes from one IP should create only one alert."""
+    start_time = datetime(2026, 5, 11, 21, 33, 0)
+    failed_events = [
+        make_log_event(start_time + timedelta(minutes=minute), "203.0.113.10")
+        for minute in range(5)
+    ]
+    success_events = [
+        make_log_event(
+            start_time + timedelta(minutes=6 + minute),
+            "203.0.113.10",
+            event_type="successful_login",
+            username="alice",
+        )
+        for minute in range(2)
+    ]
+
+    alerts = detect_successful_login_after_failures(
+        failed_events + success_events,
+        threshold=5,
+        window_minutes=10,
+        allowed_ips=[],
+        severity_policy=SEVERITY_POLICY,
+    )
+
+    assert len(alerts) == 1

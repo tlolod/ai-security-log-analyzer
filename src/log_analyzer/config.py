@@ -24,6 +24,7 @@ ALLOWED_SEVERITIES = {"low", "medium", "high", "critical"}
 KNOWN_ALERT_TYPES = {
     "brute_force_suspected",
     "suspicious_username_targeted",
+    "successful_login_after_failures",
 }
 
 
@@ -66,6 +67,7 @@ def default_severity_policy() -> dict[str, str]:
     return {
         "brute_force_suspected": "medium",
         "suspicious_username_targeted": "low",
+        "successful_login_after_failures": "high",
     }
 
 

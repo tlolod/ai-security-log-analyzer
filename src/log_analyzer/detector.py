@@ -18,6 +18,10 @@ SUSPICIOUS_USERNAME_RULE_ID = "AUTH-002"
 SUSPICIOUS_USERNAME_RULE_NAME = "Suspicious Username Targeted"
 SUSPICIOUS_USERNAME_RULE_VERSION = "1.0"
 
+SUCCESSFUL_AFTER_FAILURES_RULE_ID = "AUTH-003"
+SUCCESSFUL_AFTER_FAILURES_RULE_NAME = "Successful SSH Login After Failures"
+SUCCESSFUL_AFTER_FAILURES_RULE_VERSION = "1.0"
+
 
 def detect_failed_login_bursts(
     events: list[LogEvent],
@@ -94,6 +98,83 @@ def detect_failed_login_bursts(
                 continue
 
             window_end_index += 1
+
+    return alerts
+
+
+def detect_successful_login_after_failures(
+    events: list[LogEvent],
+    threshold: int,
+    window_minutes: int,
+    allowed_ips: list[str],
+    severity_policy: dict[str, str],
+) -> list[Alert]:
+    """Detect a successful SSH login after repeated failures from one IP.
+
+    A success after many failures can indicate that an attacker guessed a valid
+    password. This rule is intentionally source-IP based and creates at most one
+    alert per IP address to avoid duplicate alert spam.
+    """
+    events_by_ip: defaultdict[str, list[LogEvent]] = defaultdict(list)
+    allowed_ip_set = set(allowed_ips)
+
+    for event in events:
+        if event.source_ip in allowed_ip_set:
+            continue
+
+        if event.event_type in {"failed_login", "successful_login"}:
+            events_by_ip[event.source_ip].append(event)
+
+    alerts: list[Alert] = []
+    alerted_ips: set[str] = set()
+    detection_window = timedelta(minutes=window_minutes)
+
+    for source_ip, ip_events in events_by_ip.items():
+        if source_ip in alerted_ips:
+            continue
+
+        ip_events.sort(key=lambda event: event.timestamp)
+
+        for success_event in ip_events:
+            if success_event.event_type != "successful_login":
+                continue
+
+            failed_events = [
+                event
+                for event in ip_events
+                if event.event_type == "failed_login"
+                and event.timestamp < success_event.timestamp
+                and success_event.timestamp - event.timestamp <= detection_window
+            ]
+
+            if len(failed_events) < threshold:
+                continue
+
+            username_text = success_event.username or "unknown"
+            evidence = [event.raw_line for event in failed_events[:3]]
+            evidence.append(success_event.raw_line)
+
+            alerts.append(
+                Alert(
+                    alert_type="successful_login_after_failures",
+                    rule_id=SUCCESSFUL_AFTER_FAILURES_RULE_ID,
+                    rule_name=SUCCESSFUL_AFTER_FAILURES_RULE_NAME,
+                    rule_version=SUCCESSFUL_AFTER_FAILURES_RULE_VERSION,
+                    severity=severity_policy["successful_login_after_failures"],
+                    message=(
+                        f"Detected successful login for '{username_text}' from {source_ip} "
+                        f"after {len(failed_events)} failed login attempts within "
+                        f"{window_minutes} minutes."
+                    ),
+                    source_ip=source_ip,
+                    first_seen=failed_events[0].timestamp,
+                    last_seen=success_event.timestamp,
+                    failed_count=len(failed_events),
+                    evidence=evidence,
+                )
+            )
+            alerted_ips.add(source_ip)
+            break
 
     return alerts
 
