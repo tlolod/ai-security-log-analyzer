@@ -239,3 +239,34 @@ def detect_suspicious_usernames(
         alerted_pairs.add(alert_key)
 
     return alerts
+
+
+def apply_alert_cooldown(alerts: list[Alert], cooldown_minutes: int) -> list[Alert]:
+    """Suppress repeated alerts with the same source IP and alert type.
+
+    Cooldown is in-memory only and applies within one analyzer run. Alerts are
+    sorted deterministically by ``last_seen`` so suppression does not depend on
+    detector execution order.
+    """
+    cooldown_window = timedelta(minutes=cooldown_minutes)
+    kept_alerts: list[Alert] = []
+    last_kept_by_key: dict[tuple[str, str], Alert] = {}
+
+    sorted_alerts = sorted(
+        alerts,
+        key=lambda alert: (alert.last_seen, alert.source_ip, alert.alert_type),
+    )
+
+    for alert in sorted_alerts:
+        dedup_key = (alert.source_ip, alert.alert_type)
+        previous_alert = last_kept_by_key.get(dedup_key)
+
+        if previous_alert is not None:
+            delta = alert.last_seen - previous_alert.last_seen
+            if delta < cooldown_window:
+                continue
+
+        kept_alerts.append(alert)
+        last_kept_by_key[dedup_key] = alert
+
+    return kept_alerts

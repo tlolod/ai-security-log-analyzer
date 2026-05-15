@@ -109,8 +109,10 @@ def test_run_writes_json_output_file(tmp_path: Path) -> None:
     assert payload["alert_count"] >= 1
     assert "alerts" in payload
     assert "summary" in payload
-    assert payload["alerts"][0]["alert_type"] == "brute_force_suspected"
-    assert payload["alerts"][0]["mitre_attack"] == {
+    brute_force_alert = next(
+        alert for alert in payload["alerts"] if alert["alert_type"] == "brute_force_suspected"
+    )
+    assert brute_force_alert["mitre_attack"] == {
         "tactic": "Credential Access",
         "technique_id": "T1110",
         "technique": "Brute Force",
@@ -138,9 +140,9 @@ def test_run_writes_csv_output_file(tmp_path: Path) -> None:
 
     assert exit_code == 0
     assert len(rows) >= 1
-    assert rows[0]["alert_type"] == "brute_force_suspected"
-    assert rows[0]["mitre_technique_id"] == "T1110"
-    assert "Failed password for root" in rows[0]["evidence"]
+    brute_force_row = next(row for row in rows if row["alert_type"] == "brute_force_suspected")
+    assert brute_force_row["mitre_technique_id"] == "T1110"
+    assert "Failed password for root" in brute_force_row["evidence"]
 
 
 def test_run_uses_config_file_values(tmp_path: Path, capsys) -> None:
@@ -164,6 +166,50 @@ def test_run_uses_config_file_values(tmp_path: Path, capsys) -> None:
     assert exit_code == 0
     assert "brute_force_suspected" in captured.out
     assert "Detected 3 failed login attempts" in captured.out
+
+
+def test_run_applies_global_alert_cooldown(tmp_path: Path) -> None:
+    """Cooldown should suppress repeated same-IP same-type alerts from one rule."""
+    log_path = write_log_file(
+        tmp_path / "auth.log",
+        [
+            failed_login_line(33),
+            failed_login_line(34),
+            failed_login_line(35),
+            failed_login_line(36),
+            failed_login_line(37),
+            failed_login_line(38),
+            failed_login_line(39, source_ip="198.51.100.77"),
+            failed_login_line(40, source_ip="198.51.100.77"),
+            failed_login_line(41, source_ip="198.51.100.77"),
+            failed_login_line(42, source_ip="198.51.100.77"),
+            failed_login_line(43, source_ip="198.51.100.77"),
+            failed_login_line(44, source_ip="198.51.100.77"),
+        ],
+    )
+    output_path = tmp_path / "alerts.json"
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        '{"failed_login_threshold": 3, "window_minutes": 10, "alert_cooldown_minutes": 30}',
+        encoding="utf-8",
+    )
+
+    exit_code = run(
+        file_path=str(log_path),
+        threshold=None,
+        window_minutes=None,
+        year=2026,
+        config_path=str(config_path),
+        output_path=str(output_path),
+    )
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 0
+    brute_force_alerts = [
+        alert for alert in payload["alerts"] if alert["alert_type"] == "brute_force_suspected"
+    ]
+    assert len(brute_force_alerts) == 2
 
 
 def test_build_arg_parser_accepts_expected_arguments() -> None:

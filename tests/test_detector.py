@@ -3,11 +3,12 @@
 from datetime import datetime, timedelta
 
 from src.log_analyzer.detector import (
+    apply_alert_cooldown,
     detect_failed_login_bursts,
     detect_successful_login_after_failures,
     detect_suspicious_usernames,
 )
-from src.log_analyzer.models import LogEvent
+from src.log_analyzer.models import Alert, LogEvent
 
 
 TARGETED_USERNAMES = ["root", "admin", "administrator", "oracle", "postgres", "guest", "test"]
@@ -40,6 +41,28 @@ def make_log_event(
         username=username,
         event_type=event_type,
         raw_line=f"sample raw line from {source_ip} at {timestamp.isoformat()}",
+    )
+
+
+def make_alert(
+    timestamp: datetime,
+    source_ip: str,
+    alert_type: str,
+) -> Alert:
+    """Create a minimal deterministic Alert for cooldown tests."""
+    return Alert(
+        alert_type=alert_type,
+        rule_id="AUTH-TEST",
+        rule_name="Test Rule",
+        rule_version="1.0",
+        severity="medium",
+        mitre_attack=None,
+        message=f"test alert for {source_ip}",
+        source_ip=source_ip,
+        first_seen=timestamp,
+        last_seen=timestamp,
+        failed_count=1,
+        evidence=["sample evidence"],
     )
 
 
@@ -664,3 +687,70 @@ def test_detect_successful_login_after_failures_alerts_once_per_ip() -> None:
     )
 
     assert len(alerts) == 1
+
+
+def test_apply_alert_cooldown_suppresses_same_ip_same_type_within_window() -> None:
+    """A repeated alert inside cooldown should be suppressed."""
+    start_time = datetime(2026, 5, 11, 21, 0, 0)
+    alerts = [
+        make_alert(start_time, "203.0.113.10", "brute_force_suspected"),
+        make_alert(start_time + timedelta(minutes=10), "203.0.113.10", "brute_force_suspected"),
+    ]
+
+    deduplicated = apply_alert_cooldown(alerts, cooldown_minutes=30)
+
+    assert len(deduplicated) == 1
+    assert deduplicated[0].last_seen == start_time
+
+
+def test_apply_alert_cooldown_allows_same_ip_same_type_at_boundary() -> None:
+    """A repeated alert at exactly cooldown minutes should be allowed."""
+    start_time = datetime(2026, 5, 11, 21, 0, 0)
+    alerts = [
+        make_alert(start_time, "203.0.113.10", "brute_force_suspected"),
+        make_alert(start_time + timedelta(minutes=30), "203.0.113.10", "brute_force_suspected"),
+    ]
+
+    deduplicated = apply_alert_cooldown(alerts, cooldown_minutes=30)
+
+    assert len(deduplicated) == 2
+
+
+def test_apply_alert_cooldown_allows_same_ip_different_alert_types() -> None:
+    """Different alert types from the same IP should not suppress each other."""
+    start_time = datetime(2026, 5, 11, 21, 0, 0)
+    alerts = [
+        make_alert(start_time, "203.0.113.10", "brute_force_suspected"),
+        make_alert(start_time + timedelta(minutes=5), "203.0.113.10", "suspicious_username_targeted"),
+    ]
+
+    deduplicated = apply_alert_cooldown(alerts, cooldown_minutes=30)
+
+    assert len(deduplicated) == 2
+
+
+def test_apply_alert_cooldown_allows_different_ips() -> None:
+    """The same alert type on different IPs should not be suppressed."""
+    start_time = datetime(2026, 5, 11, 21, 0, 0)
+    alerts = [
+        make_alert(start_time, "203.0.113.10", "brute_force_suspected"),
+        make_alert(start_time + timedelta(minutes=5), "198.51.100.77", "brute_force_suspected"),
+    ]
+
+    deduplicated = apply_alert_cooldown(alerts, cooldown_minutes=30)
+
+    assert len(deduplicated) == 2
+
+
+def test_apply_alert_cooldown_is_deterministic_for_unsorted_input() -> None:
+    """Cooldown behavior should be deterministic even when alerts are unsorted."""
+    start_time = datetime(2026, 5, 11, 21, 0, 0)
+    alerts = [
+        make_alert(start_time + timedelta(minutes=10), "203.0.113.10", "brute_force_suspected"),
+        make_alert(start_time, "203.0.113.10", "brute_force_suspected"),
+    ]
+
+    deduplicated = apply_alert_cooldown(alerts, cooldown_minutes=30)
+
+    assert len(deduplicated) == 1
+    assert deduplicated[0].last_seen == start_time

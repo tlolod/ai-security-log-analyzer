@@ -24,6 +24,7 @@ The current MVP can:
 - Suppress alerts from configured allowed IP addresses
 - Load and validate JSON configuration files
 - Configure failed-login thresholds, detection windows, targeted usernames, allowed IPs, and severity policy
+- Suppress repeated alerts by source IP and alert type using a configurable cooldown window
 - Include detection rule metadata in alerts
 - Print structured JSON-style alerts to the console
 - Print alert summary statistics by alert type, severity, and unique source IP count
@@ -168,6 +169,7 @@ Supported config keys:
 | --- | --- |
 | `failed_login_threshold` | Number of failed logins needed for failed-login-based alerts |
 | `window_minutes` | Time window used by failed-login-based detectors |
+| `alert_cooldown_minutes` | In-memory cooldown used to suppress repeated alerts with the same source IP and alert type |
 | `targeted_usernames` | Usernames that trigger suspicious-username alerts |
 | `allowed_ips` | Exact IP addresses that should be suppressed from alerts |
 | `severity_policy` | Severity labels for known alert types |
@@ -175,6 +177,14 @@ Supported config keys:
 Configuration is validated before use. Unknown keys, invalid JSON, invalid IP addresses, invalid severity values, and wrong value types fail clearly.
 
 CLI values for `--threshold` and `--window` override config-file values so short experiments remain easy.
+
+Cooldown behavior notes:
+
+- Cooldown is applied globally after all detector rules generate alerts.
+- Deduplication key is `(source_ip, alert_type)`.
+- Suppression uses alert `last_seen` timestamps.
+- Alerts are suppressed only when the gap is strictly less than `alert_cooldown_minutes`.
+- Cooldown state is in-memory only for a single run (no persistence between runs).
 
 ## Example Usage
 

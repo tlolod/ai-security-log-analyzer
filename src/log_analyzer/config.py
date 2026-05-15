@@ -14,6 +14,7 @@ from pathlib import Path
 ALLOWED_CONFIG_KEYS = {
     "failed_login_threshold",
     "window_minutes",
+    "alert_cooldown_minutes",
     "targeted_usernames",
     "allowed_ips",
     "severity_policy",
@@ -34,6 +35,7 @@ class AnalyzerConfig:
 
     failed_login_threshold: int
     window_minutes: int
+    alert_cooldown_minutes: int
     targeted_usernames: list[str]
     allowed_ips: list[str]
     severity_policy: dict[str, str]
@@ -48,6 +50,7 @@ def default_config() -> AnalyzerConfig:
     return AnalyzerConfig(
         failed_login_threshold=5,
         window_minutes=10,
+        alert_cooldown_minutes=30,
         targeted_usernames=[
             "root",
             "admin",
@@ -120,6 +123,12 @@ def config_from_dict(data: dict[str, object]) -> AnalyzerConfig:
         config.window_minutes = _validate_positive_int(
             data["window_minutes"],
             "window_minutes",
+        )
+
+    if "alert_cooldown_minutes" in data:
+        config.alert_cooldown_minutes = _validate_positive_int(
+            data["alert_cooldown_minutes"],
+            "alert_cooldown_minutes",
         )
 
     if "targeted_usernames" in data:

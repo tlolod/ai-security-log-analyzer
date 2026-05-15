@@ -19,6 +19,7 @@ def test_default_config_returns_expected_values() -> None:
 
     assert config.failed_login_threshold == 5
     assert config.window_minutes == 10
+    assert config.alert_cooldown_minutes == 30
     assert "root" in config.targeted_usernames
     assert "admin" in config.targeted_usernames
     assert config.allowed_ips == []
@@ -33,6 +34,7 @@ def test_load_config_none_returns_defaults() -> None:
 
     assert config.failed_login_threshold == 5
     assert config.window_minutes == 10
+    assert config.alert_cooldown_minutes == 30
     assert config.allowed_ips == []
     assert config.severity_policy["brute_force_suspected"] == "medium"
     assert config.severity_policy["successful_login_after_failures"] == "high"
@@ -46,6 +48,7 @@ def test_load_config_reads_valid_json_file(tmp_path: Path) -> None:
         {
           "failed_login_threshold": 8,
           "window_minutes": 15,
+          "alert_cooldown_minutes": 20,
           "targeted_usernames": ["Root", "Admin"],
           "allowed_ips": ["203.0.113.10"],
           "severity_policy": {
@@ -59,6 +62,7 @@ def test_load_config_reads_valid_json_file(tmp_path: Path) -> None:
 
     assert config.failed_login_threshold == 8
     assert config.window_minutes == 15
+    assert config.alert_cooldown_minutes == 20
     assert config.targeted_usernames == ["root", "admin"]
     assert config.allowed_ips == ["203.0.113.10"]
     assert config.severity_policy["brute_force_suspected"] == "high"
@@ -77,6 +81,7 @@ def test_load_config_uses_defaults_for_missing_keys(tmp_path: Path) -> None:
 
     assert config.failed_login_threshold == 7
     assert config.window_minutes == 10
+    assert config.alert_cooldown_minutes == 30
     assert "root" in config.targeted_usernames
     assert config.allowed_ips == []
     assert config.severity_policy["suspicious_username_targeted"] == "low"
@@ -117,6 +122,29 @@ def test_load_config_rejects_invalid_window(tmp_path: Path) -> None:
     config_path = write_config_file(
         tmp_path / "config.json",
         '{"window_minutes": -1}',
+    )
+
+    with pytest.raises(ValueError):
+        load_config(str(config_path))
+
+
+def test_load_config_accepts_alert_cooldown_override(tmp_path: Path) -> None:
+    """Alert cooldown should be configurable as a positive integer."""
+    config_path = write_config_file(
+        tmp_path / "config.json",
+        '{"alert_cooldown_minutes": 45}',
+    )
+
+    config = load_config(str(config_path))
+
+    assert config.alert_cooldown_minutes == 45
+
+
+def test_load_config_rejects_invalid_alert_cooldown(tmp_path: Path) -> None:
+    """Alert cooldown must be a positive integer."""
+    config_path = write_config_file(
+        tmp_path / "config.json",
+        '{"alert_cooldown_minutes": 0}',
     )
 
     with pytest.raises(ValueError):

@@ -12,6 +12,7 @@ from datetime import datetime
 
 from .config import load_config
 from .detector import (
+    apply_alert_cooldown,
     detect_failed_login_bursts,
     detect_successful_login_after_failures,
     detect_suspicious_usernames,
@@ -105,6 +106,7 @@ def run(
                 config.severity_policy,
             )
         )
+        alerts = apply_alert_cooldown(alerts, config.alert_cooldown_minutes)
 
         print_alerts(alerts)
         alert_summary = build_alert_summary(alerts)

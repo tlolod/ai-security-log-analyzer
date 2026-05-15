@@ -62,8 +62,9 @@ The current data flow is:
 4. `loader.py` validates the local log path and reads raw text lines.
 5. `parser.py` converts recognized SSH failed-login and successful-login lines into structured `LogEvent` objects.
 6. `detector.py` applies detection rules to the parsed events.
-7. Configured allowed IPs are suppressed from supported alerts.
-8. `formatter.py` converts alerts into readable JSON-style console output.
+7. `detector.py` applies in-memory alert cooldown suppression by `(source_ip, alert_type)`.
+8. Configured allowed IPs are suppressed from supported alerts.
+9. `formatter.py` converts alerts into readable JSON-style console output.
 9. `formatter.py` builds alert summary statistics by type, severity, and unique source IP count.
 10. `formatter.py` optionally writes alerts and summary data to a JSON file.
 11. `formatter.py` optionally writes alerts to a CSV file.
@@ -206,6 +207,7 @@ Supported keys:
 - `targeted_usernames`
 - `allowed_ips`
 - `severity_policy`
+- `alert_cooldown_minutes`
 
 The default config file is:
 
@@ -226,6 +228,7 @@ The current detector supports:
 - Successful-login-after-failures detection using the same failed-login threshold and time window.
 - Exact IP allowlist suppression through `allowed_ips`.
 - Configurable severity labels through `severity_policy`.
+- In-memory cooldown/deduplication using `alert_cooldown_minutes` and `(source_ip, alert_type)`.
 - Stable rule metadata for every alert.
 - MITRE ATT&CK mapping metadata for current credential attack rules.
 

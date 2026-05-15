@@ -136,6 +136,7 @@ Current coverage includes:
 
 - `tests/test_parser.py`: supported SSH failed-login lines and unsupported skipped lines
 - `tests/test_detector.py`: brute-force detection, suspicious username detection, allowed IP suppression, severity policy, duplicate suppression, and negative cases
+- Cooldown deduplication is intentionally in-memory only per analyzer run (no database or persistent state)
 - `tests/test_config.py`: default config, JSON loading, validation, normalization, unknown keys, allowed IPs, and severity policy
 - `tests/test_formatter.py`: alert formatting, alert summary statistics, JSON export, and output path validation
 
@@ -187,6 +188,7 @@ Keeping these boundaries clear makes the code easier for beginners and safer for
 - **Time window**: the period in which events are counted together.
 - **Allowlist**: trusted IP addresses that should be suppressed from supported alerts.
 - **Severity policy**: config-controlled severity labels for known alert types.
+- **Alert cooldown**: config-controlled suppression window for repeated `(source_ip, alert_type)` alerts.
 - **Untrusted input**: data that should be handled carefully because it may be malformed or malicious.
 
 ## Future Notes

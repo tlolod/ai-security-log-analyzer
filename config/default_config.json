@@ -1,6 +1,7 @@
 {
   "failed_login_threshold": 5,
   "window_minutes": 10,
+  "alert_cooldown_minutes": 30,
   "targeted_usernames": [
     "root",
     "admin",

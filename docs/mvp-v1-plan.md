@@ -13,6 +13,7 @@ MVP v1 should be able to:
 - Detect successful SSH logins after repeated failures from the same source IP.
 - Support a small JSON configuration system.
 - Suppress alerts from known allowed IP addresses.
+- Suppress repeated alerts with the same source IP and alert type during one run.
 - Print structured alerts to the terminal.
 - Provide alert summary statistics and a short run summary.
 - Optionally export alerts to JSON or CSV.
@@ -35,6 +36,7 @@ Implemented capabilities include:
 - Suspicious username detection rule
 - Successful-login-after-failures detection rule
 - IP allowlist suppression
+- In-memory alert cooldown/deduplication
 - JSON configuration system
 - Configurable severity policy
 - Detection rule metadata
@@ -158,6 +160,7 @@ Status: complete.
 - Targeted usernames
 - Allowed IPs
 - Severity policy
+- Alert cooldown window
 
 Configuration input is validated before use.
 
