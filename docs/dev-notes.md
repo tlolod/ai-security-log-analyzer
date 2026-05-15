@@ -12,7 +12,7 @@ Current known status:
 - Tests exist under `tests/`
 - Default config exists at `config/default_config.json`
 - Development dependencies are listed in `requirements-dev.txt`
-- `pytest` is the current test dependency
+- `pytest` and `ruff` are the current development dependencies
 - GitHub Actions CI runs tests on push and pull request
 - Architecture documentation exists in `docs/architecture.md`
 - AI assistant guidance exists in `AGENTS.md`
@@ -41,6 +41,12 @@ Install development dependencies:
 
 ```bash
 python -m pip install -r requirements-dev.txt
+```
+
+Run lint checks:
+
+```bash
+python -m ruff check .
 ```
 
 Run tests:
@@ -81,7 +87,7 @@ Recommended workflow:
 1. Start from the latest main branch.
 2. Create a focused feature branch.
 3. Make small, reviewable changes.
-4. Run pytest locally.
+4. Run Ruff and pytest locally.
 5. Update documentation when behavior or workflow changes.
 6. Push the branch.
 7. Open a pull request.
@@ -111,7 +117,7 @@ Good prompts for this project:
 - “Only modify the files needed for this milestone.”
 - “Add comments that explain why the code exists.”
 - “Update docs if CLI flags, config keys, alert fields, or detection rules change.”
-- “Run pytest after implementation changes.”
+- “Run Ruff and pytest after implementation changes.”
 
 ## Current Testing Strategy
 

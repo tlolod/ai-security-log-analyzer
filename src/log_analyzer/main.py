@@ -44,7 +44,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--year",
         type=int,
         default=datetime.now().year,
-        help="Year for syslog timestamps",
+        help="Year to attach to syslog timestamps that do not include a year",
     )
     parser.add_argument("--config", help="Optional path to JSON configuration file")
     parser.add_argument("--output", help="Optional path to write alerts as JSON")

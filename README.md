@@ -127,7 +127,7 @@ For development and testing, install the development dependencies:
 python -m pip install -r requirements-dev.txt
 ```
 
-`pytest` is currently the only development dependency.
+`pytest` and `ruff` are the current development dependencies.
 
 ### Clone the Repository
 
@@ -182,6 +182,8 @@ Analyze the included sample log with built-in defaults:
 PYTHONPATH=src python -m log_analyzer.main --file sample_logs/auth_sample.log --year 2026
 ```
 
+The sample log uses syslog-style timestamps that do not include a year, so the examples pass `--year 2026` for deterministic demo output.
+
 Use a custom threshold and detection window:
 
 ```bash
@@ -213,7 +215,7 @@ PYTHONPATH=src python -m log_analyzer.main \
 
 ## Example Output
 
-Example alert output:
+The sample log intentionally includes repeated failed SSH logins, a successful login after those failures, and suspicious usernames. Abbreviated example output:
 
 ```text
 === ALERTS ===
@@ -229,24 +231,49 @@ Example alert output:
   "last_seen": "2026-05-11T21:37:55",
   "failed_count": 5,
   "evidence": [
-    "May 11 21:33:01 server sshd[1234]: Failed password for invalid user admin from 203.0.113.10 port 54231 ssh2"
+    "May 11 21:33:01 server sshd[1234]: Failed password for invalid user admin from 203.0.113.10 port 54231 ssh2",
+    "May 11 21:34:12 server sshd[1235]: Failed password for invalid user admin from 203.0.113.10 port 54232 ssh2",
+    "May 11 21:35:25 server sshd[1236]: Failed password for invalid user admin from 203.0.113.10 port 54233 ssh2"
   ]
 }
+{
+  "alert_type": "successful_login_after_failures",
+  "rule_id": "AUTH-003",
+  "rule_name": "Successful SSH Login After Failures",
+  "rule_version": "1.0",
+  "severity": "high",
+  "message": "Detected successful login for 'alice' from 203.0.113.10 after 6 failed login attempts within 10 minutes.",
+  "source_ip": "203.0.113.10",
+  "first_seen": "2026-05-11T21:33:01",
+  "last_seen": "2026-05-11T21:39:30",
+  "failed_count": 6,
+  "evidence": [
+    "May 11 21:33:01 server sshd[1234]: Failed password for invalid user admin from 203.0.113.10 port 54231 ssh2",
+    "May 11 21:34:12 server sshd[1235]: Failed password for invalid user admin from 203.0.113.10 port 54232 ssh2",
+    "May 11 21:35:25 server sshd[1236]: Failed password for invalid user admin from 203.0.113.10 port 54233 ssh2",
+    "May 11 21:39:30 server sshd[1241]: Accepted password for alice from 203.0.113.10 port 54237 ssh2"
+  ]
+}
+... additional suspicious_username_targeted alerts omitted ...
 === ALERT SUMMARY ===
 
 Alerts by type:
 - brute_force_suspected: 1
+- successful_login_after_failures: 1
+- suspicious_username_targeted: 2
 
 Alerts by severity:
 - medium: 1
+- high: 1
+- low: 2
 
 Unique source IPs:
-- 1
+- 2
 === RUN SUMMARY ===
-Total lines: 11
-Parsed events: 7
-Skipped lines: 4
-Alerts generated: 1
+Total lines: 12
+Parsed events: 9
+Skipped lines: 3
+Alerts generated: 4
 ```
 
 Output may vary as sample data and detection rules evolve.
@@ -277,6 +304,12 @@ Install test dependencies:
 python -m pip install -r requirements-dev.txt
 ```
 
+Run lint checks:
+
+```bash
+python -m ruff check .
+```
+
 Run the test suite:
 
 ```bash
@@ -300,6 +333,7 @@ GitHub Actions runs the test suite on:
 The CI workflow uses Python 3.12, installs `requirements-dev.txt`, and runs:
 
 ```bash
+python -m ruff check .
 PYTHONPATH=src python -m pytest
 ```
 
@@ -312,7 +346,7 @@ Recommended workflow for contributors:
 3. Preserve the layered architecture.
 4. Add or update tests for behavior changes.
 5. Update documentation when CLI flags, config keys, alert schema, or detection rules change.
-6. Run pytest locally before opening a pull request.
+6. Run Ruff and pytest locally before opening a pull request.
 7. Push the branch and open a pull request.
 8. Let GitHub Actions confirm the test suite passes before merging.
 
