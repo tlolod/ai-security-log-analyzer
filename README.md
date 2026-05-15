@@ -28,6 +28,7 @@ The current MVP can:
 - Print structured JSON-style alerts to the console
 - Print alert summary statistics by alert type, severity, and unique source IP count
 - Export alerts and summaries to JSON files
+- Export alerts to CSV files
 - Run a pytest unit test suite
 - Run tests automatically in GitHub Actions CI on push and pull request
 
@@ -214,6 +215,15 @@ PYTHONPATH=src python -m log_analyzer.main \
   --year 2026
 ```
 
+Export alerts to a CSV file:
+
+```bash
+PYTHONPATH=src python -m log_analyzer.main \
+  --file sample_logs/auth_sample.log \
+  --year 2026 \
+  --csv-output alerts.csv
+```
+
 ## Example Output
 
 The sample log intentionally includes repeated failed SSH logins, a successful login after those failures, and suspicious usernames. Abbreviated example output:
@@ -289,7 +299,7 @@ Alerts generated: 4
 
 Output may vary as sample data and detection rules evolve.
 
-## JSON Export
+## Alert Export
 
 When `--output` is provided, the formatter writes a JSON file with this structure:
 
@@ -306,6 +316,14 @@ When `--output` is provided, the formatter writes a JSON file with this structur
 ```
 
 The same alert fields printed to the console are included in exported alerts.
+
+When `--csv-output` is provided, the formatter writes one alert per CSV row. MITRE ATT&CK metadata is flattened into `mitre_tactic`, `mitre_technique_id`, and `mitre_technique` columns. Multiple evidence lines are joined in the `evidence` column with ` | `.
+
+CSV columns:
+
+```text
+alert_type,rule_id,rule_name,rule_version,severity,mitre_tactic,mitre_technique_id,mitre_technique,source_ip,first_seen,last_seen,failed_count,message,evidence
+```
 
 ## Testing
 

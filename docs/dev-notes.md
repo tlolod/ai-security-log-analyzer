@@ -80,6 +80,15 @@ PYTHONPATH=src python -m log_analyzer.main \
   --year 2026
 ```
 
+Run with CSV alert export:
+
+```bash
+PYTHONPATH=src python -m log_analyzer.main \
+  --file sample_logs/auth_sample.log \
+  --csv-output alerts.csv \
+  --year 2026
+```
+
 ## Git Feature-Branch Workflow
 
 Recommended workflow:

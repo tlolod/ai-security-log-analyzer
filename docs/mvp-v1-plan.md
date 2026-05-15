@@ -15,7 +15,7 @@ MVP v1 should be able to:
 - Suppress alerts from known allowed IP addresses.
 - Print structured alerts to the terminal.
 - Provide alert summary statistics and a short run summary.
-- Optionally export alerts to JSON.
+- Optionally export alerts to JSON or CSV.
 - Be easy for a beginner developer to read, test, and extend.
 
 The MVP is not meant to be a complete SIEM, threat intelligence platform, or AI product. It is a learning-focused foundation.
@@ -40,6 +40,7 @@ Implemented capabilities include:
 - Detection rule metadata
 - MITRE ATT&CK mapping metadata
 - JSON alert export
+- CSV alert export
 - Alert summary statistics
 - pytest unit test suite
 - GitHub Actions CI workflow
@@ -131,6 +132,7 @@ Status: complete.
 - Alert summary statistics
 - Run summary statistics
 - Optional JSON alert export
+- Optional CSV alert export
 
 ### Milestone 7: Tests
 

@@ -1,5 +1,6 @@
 """Tests for main.py orchestration behavior."""
 
+import csv
 import json
 from pathlib import Path
 
@@ -116,6 +117,32 @@ def test_run_writes_json_output_file(tmp_path: Path) -> None:
     }
 
 
+def test_run_writes_csv_output_file(tmp_path: Path) -> None:
+    """When csv_output_path is provided, run should write CSV alert output."""
+    log_path = write_log_file(
+        tmp_path / "auth.log",
+        [failed_login_line(minute) for minute in range(33, 36)],
+    )
+    csv_output_path = tmp_path / "alerts.csv"
+
+    exit_code = run(
+        file_path=str(log_path),
+        threshold=3,
+        window_minutes=10,
+        year=2026,
+        csv_output_path=str(csv_output_path),
+    )
+
+    with csv_output_path.open(encoding="utf-8", newline="") as csv_file:
+        rows = list(csv.DictReader(csv_file))
+
+    assert exit_code == 0
+    assert len(rows) >= 1
+    assert rows[0]["alert_type"] == "brute_force_suspected"
+    assert rows[0]["mitre_technique_id"] == "T1110"
+    assert "Failed password for root" in rows[0]["evidence"]
+
+
 def test_run_uses_config_file_values(tmp_path: Path, capsys) -> None:
     """Config file values should be used when CLI overrides are not provided."""
     log_path = write_log_file(
@@ -157,6 +184,8 @@ def test_build_arg_parser_accepts_expected_arguments() -> None:
             "config/default_config.json",
             "--output",
             "alerts.json",
+            "--csv-output",
+            "alerts.csv",
         ]
     )
 
@@ -166,3 +195,4 @@ def test_build_arg_parser_accepts_expected_arguments() -> None:
     assert args.year == 2026
     assert args.config == "config/default_config.json"
     assert args.output == "alerts.json"
+    assert args.csv_output == "alerts.csv"

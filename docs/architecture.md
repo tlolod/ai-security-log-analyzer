@@ -11,7 +11,7 @@ The current MVP focuses on a simple but realistic workflow:
 3. Load validated runtime configuration.
 4. Detect suspicious failed-login and successful-after-failures patterns.
 5. Print structured alerts and summary statistics.
-6. Optionally export alerts to JSON.
+6. Optionally export alerts to JSON or CSV.
 7. Keep the system easy to understand, test, and extend.
 
 This project should teach both Python fundamentals and practical cybersecurity engineering habits.
@@ -41,6 +41,7 @@ Formatting / Output Layer
      +--> console alerts
      +--> alert summary statistics
      +--> optional JSON export
+     +--> optional CSV export
 ```
 
 A shorter way to describe the architecture is:
@@ -65,7 +66,8 @@ The current data flow is:
 8. `formatter.py` converts alerts into readable JSON-style console output.
 9. `formatter.py` builds alert summary statistics by type, severity, and unique source IP count.
 10. `formatter.py` optionally writes alerts and summary data to a JSON file.
-11. `main.py` prints run statistics and returns a process-style exit code.
+11. `formatter.py` optionally writes alerts to a CSV file.
+12. `main.py` prints run statistics and returns a process-style exit code.
 
 The core idea is to separate raw text handling, configuration validation, detection logic, and output formatting. This makes the code easier to debug and safer to extend.
 
@@ -174,6 +176,7 @@ It should:
 - Print alert summaries.
 - Print run summaries.
 - Write optional JSON alert export files.
+- Write optional CSV alert export files.
 
 It should not contain detection, parsing, or config-loading logic.
 
@@ -241,6 +244,8 @@ Optional JSON export includes:
 - `alerts`
 - `alert_count`
 - `summary`
+
+Optional CSV export includes one row per alert with flattened MITRE ATT&CK columns and evidence joined into a single cell.
 
 The formatter owns output behavior so detector rules can stay focused on security logic.
 

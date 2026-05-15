@@ -4,11 +4,30 @@ The formatter layer turns structured data into readable output for humans.
 It does not load files, parse logs, or detect suspicious activity.
 """
 
+import csv
 import json
 from collections import Counter
 from pathlib import Path
 
 from .models import Alert, MitreAttackMetadata, RunStats
+
+
+CSV_ALERT_COLUMNS = [
+    "alert_type",
+    "rule_id",
+    "rule_name",
+    "rule_version",
+    "severity",
+    "mitre_tactic",
+    "mitre_technique_id",
+    "mitre_technique",
+    "source_ip",
+    "first_seen",
+    "last_seen",
+    "failed_count",
+    "message",
+    "evidence",
+]
 
 
 def format_mitre_attack(metadata: MitreAttackMetadata | None) -> dict[str, str] | None:
@@ -20,6 +39,28 @@ def format_mitre_attack(metadata: MitreAttackMetadata | None) -> dict[str, str] 
         "tactic": metadata.tactic,
         "technique_id": metadata.technique_id,
         "technique": metadata.technique,
+    }
+
+
+def format_alert_for_csv(alert: Alert) -> dict[str, object]:
+    """Convert an alert into a flat dictionary for CSV export."""
+    mitre_attack = alert.mitre_attack
+
+    return {
+        "alert_type": alert.alert_type,
+        "rule_id": alert.rule_id,
+        "rule_name": alert.rule_name,
+        "rule_version": alert.rule_version,
+        "severity": alert.severity,
+        "mitre_tactic": mitre_attack.tactic if mitre_attack is not None else "",
+        "mitre_technique_id": mitre_attack.technique_id if mitre_attack is not None else "",
+        "mitre_technique": mitre_attack.technique if mitre_attack is not None else "",
+        "source_ip": alert.source_ip,
+        "first_seen": alert.first_seen.isoformat(),
+        "last_seen": alert.last_seen.isoformat(),
+        "failed_count": alert.failed_count,
+        "message": alert.message,
+        "evidence": " | ".join(alert.evidence),
     }
 
 
@@ -126,3 +167,25 @@ def write_alerts_to_json(alerts: list[Alert], output_path: str) -> None:
     }
 
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def write_alerts_to_csv(alerts: list[Alert], output_path: str) -> None:
+    """Write alerts to a CSV file.
+
+    CSV export is useful for spreadsheet tools. Each alert becomes one row, and
+    nested MITRE ATT&CK metadata is flattened into dedicated columns.
+    """
+    path = Path(output_path)
+
+    if path.exists() and path.is_dir():
+        raise ValueError(f"Output path is a directory: {output_path}")
+
+    if path.parent != Path(".") and not path.parent.exists():
+        raise FileNotFoundError(f"Output directory does not exist: {path.parent}")
+
+    with path.open("w", encoding="utf-8", newline="") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=CSV_ALERT_COLUMNS)
+        writer.writeheader()
+
+        for alert in alerts:
+            writer.writerow(format_alert_for_csv(alert))

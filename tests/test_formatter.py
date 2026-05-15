@@ -1,12 +1,20 @@
 """Tests for formatting and exporting analyzer output."""
 
+import csv
 import json
 from datetime import datetime
 from pathlib import Path
 
 import pytest
 
-from src.log_analyzer.formatter import build_alert_summary, format_alert, write_alerts_to_json
+from src.log_analyzer.formatter import (
+    CSV_ALERT_COLUMNS,
+    build_alert_summary,
+    format_alert,
+    format_alert_for_csv,
+    write_alerts_to_csv,
+    write_alerts_to_json,
+)
 from src.log_analyzer.models import Alert, MitreAttackMetadata
 
 
@@ -22,6 +30,7 @@ def make_alert(
     severity: str = "medium",
     source_ip: str = "203.0.113.10",
     mitre_attack: MitreAttackMetadata | None = MITRE_ATTACK,
+    evidence: list[str] | None = None,
 ) -> Alert:
     """Create a deterministic alert for formatter tests."""
     return Alert(
@@ -36,7 +45,7 @@ def make_alert(
         first_seen=datetime(2026, 5, 11, 21, 33, 1),
         last_seen=datetime(2026, 5, 11, 21, 37, 55),
         failed_count=5,
-        evidence=["sample sanitized log line"],
+        evidence=evidence or ["sample sanitized log line"],
     )
 
 
@@ -72,6 +81,35 @@ def test_format_alert_handles_missing_mitre_metadata() -> None:
     assert alert_data["mitre_attack"] is None
 
 
+def test_format_alert_for_csv_flattens_alert() -> None:
+    """CSV formatting should flatten nested alert fields into columns."""
+    alert = make_alert(evidence=["first evidence line", "second evidence line"])
+
+    row = format_alert_for_csv(alert)
+
+    assert row["alert_type"] == "brute_force_suspected"
+    assert row["rule_id"] == "AUTH-001"
+    assert row["severity"] == "medium"
+    assert row["mitre_tactic"] == "Credential Access"
+    assert row["mitre_technique_id"] == "T1110"
+    assert row["mitre_technique"] == "Brute Force"
+    assert row["first_seen"] == "2026-05-11T21:33:01"
+    assert row["last_seen"] == "2026-05-11T21:37:55"
+    assert row["failed_count"] == 5
+    assert row["evidence"] == "first evidence line | second evidence line"
+
+
+def test_format_alert_for_csv_handles_missing_mitre_metadata() -> None:
+    """CSV MITRE columns should be empty when an alert has no MITRE mapping."""
+    alert = make_alert(mitre_attack=None)
+
+    row = format_alert_for_csv(alert)
+
+    assert row["mitre_tactic"] == ""
+    assert row["mitre_technique_id"] == ""
+    assert row["mitre_technique"] == ""
+
+
 def test_write_alerts_to_json_writes_alert_payload(tmp_path: Path) -> None:
     """JSON export should write alerts and alert_count to a file."""
     output_path = tmp_path / "alerts.json"
@@ -91,6 +129,38 @@ def test_write_alerts_to_json_writes_alert_payload(tmp_path: Path) -> None:
     assert payload["alerts"][0]["mitre_attack"]["technique_id"] == "T1110"
     assert payload["alerts"][0]["source_ip"] == "203.0.113.10"
     assert payload["alerts"][0]["first_seen"] == "2026-05-11T21:33:01"
+
+
+def test_write_alerts_to_csv_writes_header_and_rows(tmp_path: Path) -> None:
+    """CSV export should write deterministic columns and one row per alert."""
+    output_path = tmp_path / "alerts.csv"
+    alert = make_alert(evidence=["first evidence line", "second evidence line"])
+
+    write_alerts_to_csv([alert], str(output_path))
+
+    with output_path.open(encoding="utf-8", newline="") as csv_file:
+        reader = csv.DictReader(csv_file)
+        rows = list(reader)
+
+    assert reader.fieldnames == CSV_ALERT_COLUMNS
+    assert len(rows) == 1
+    assert rows[0]["alert_type"] == "brute_force_suspected"
+    assert rows[0]["mitre_technique_id"] == "T1110"
+    assert rows[0]["evidence"] == "first evidence line | second evidence line"
+
+
+def test_write_alerts_to_csv_handles_no_alerts(tmp_path: Path) -> None:
+    """No alerts should still produce a CSV file with a header row."""
+    output_path = tmp_path / "alerts.csv"
+
+    write_alerts_to_csv([], str(output_path))
+
+    with output_path.open(encoding="utf-8", newline="") as csv_file:
+        reader = csv.DictReader(csv_file)
+        rows = list(reader)
+
+    assert reader.fieldnames == CSV_ALERT_COLUMNS
+    assert rows == []
 
 
 def test_write_alerts_to_json_handles_no_alerts(tmp_path: Path) -> None:
@@ -172,9 +242,23 @@ def test_write_alerts_to_json_rejects_directory_path(tmp_path: Path) -> None:
         write_alerts_to_json([], str(tmp_path))
 
 
+def test_write_alerts_to_csv_rejects_directory_path(tmp_path: Path) -> None:
+    """A directory cannot be used as a CSV output file."""
+    with pytest.raises(ValueError):
+        write_alerts_to_csv([], str(tmp_path))
+
+
 def test_write_alerts_to_json_rejects_missing_parent_directory(tmp_path: Path) -> None:
     """Missing parent directories should fail clearly instead of being created."""
     output_path = tmp_path / "missing" / "alerts.json"
 
     with pytest.raises(FileNotFoundError):
         write_alerts_to_json([], str(output_path))
+
+
+def test_write_alerts_to_csv_rejects_missing_parent_directory(tmp_path: Path) -> None:
+    """Missing parent directories should fail clearly instead of being created."""
+    output_path = tmp_path / "missing" / "alerts.csv"
+
+    with pytest.raises(FileNotFoundError):
+        write_alerts_to_csv([], str(output_path))

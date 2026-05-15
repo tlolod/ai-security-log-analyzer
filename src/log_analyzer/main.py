@@ -22,6 +22,7 @@ from .formatter import (
     print_alerts,
     print_summary,
     write_alerts_to_json,
+    write_alerts_to_csv,
 )
 from .loader import load_log_lines
 from .models import RunStats
@@ -48,6 +49,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--config", help="Optional path to JSON configuration file")
     parser.add_argument("--output", help="Optional path to write alerts as JSON")
+    parser.add_argument("--csv-output", help="Optional path to write alerts as CSV")
 
     return parser
 
@@ -59,6 +61,7 @@ def run(
     year: int,
     config_path: str | None = None,
     output_path: str | None = None,
+    csv_output_path: str | None = None,
 ) -> int:
     """Run the analyzer pipeline and return a process-style exit code.
 
@@ -110,6 +113,9 @@ def run(
         if output_path is not None:
             write_alerts_to_json(alerts, output_path)
 
+        if csv_output_path is not None:
+            write_alerts_to_csv(alerts, csv_output_path)
+
         stats = RunStats(
             total_lines=len(lines),
             parsed_events=len(events),
@@ -138,6 +144,7 @@ def main() -> None:
         year=args.year,
         config_path=args.config,
         output_path=args.output,
+        csv_output_path=args.csv_output,
     )
     raise SystemExit(exit_code)
 
