@@ -7,7 +7,7 @@ The detector layer looks at structured ``LogEvent`` objects and creates
 from collections import defaultdict
 from datetime import timedelta
 
-from .models import Alert, LogEvent
+from .models import Alert, LogEvent, MitreAttackMetadata
 
 
 BRUTE_FORCE_RULE_ID = "AUTH-001"
@@ -21,6 +21,12 @@ SUSPICIOUS_USERNAME_RULE_VERSION = "1.0"
 SUCCESSFUL_AFTER_FAILURES_RULE_ID = "AUTH-003"
 SUCCESSFUL_AFTER_FAILURES_RULE_NAME = "Successful SSH Login After Failures"
 SUCCESSFUL_AFTER_FAILURES_RULE_VERSION = "1.0"
+
+BRUTE_FORCE_MITRE_ATTACK = MitreAttackMetadata(
+    tactic="Credential Access",
+    technique_id="T1110",
+    technique="Brute Force",
+)
 
 
 def detect_failed_login_bursts(
@@ -80,6 +86,7 @@ def detect_failed_login_bursts(
                         rule_name=BRUTE_FORCE_RULE_NAME,
                         rule_version=BRUTE_FORCE_RULE_VERSION,
                         severity=severity_policy["brute_force_suspected"],
+                        mitre_attack=BRUTE_FORCE_MITRE_ATTACK,
                         message=(
                             f"Detected {failed_count} failed login attempts from "
                             f"{source_ip} within {window_minutes} minutes."
@@ -161,6 +168,7 @@ def detect_successful_login_after_failures(
                     rule_name=SUCCESSFUL_AFTER_FAILURES_RULE_NAME,
                     rule_version=SUCCESSFUL_AFTER_FAILURES_RULE_VERSION,
                     severity=severity_policy["successful_login_after_failures"],
+                    mitre_attack=BRUTE_FORCE_MITRE_ATTACK,
                     message=(
                         f"Detected successful login for '{username_text}' from {source_ip} "
                         f"after {len(failed_events)} failed login attempts within "
@@ -216,6 +224,7 @@ def detect_suspicious_usernames(
                 rule_name=SUSPICIOUS_USERNAME_RULE_NAME,
                 rule_version=SUSPICIOUS_USERNAME_RULE_VERSION,
                 severity=severity_policy["suspicious_username_targeted"],
+                mitre_attack=BRUTE_FORCE_MITRE_ATTACK,
                 message=(
                     "Failed login attempt targeted commonly attacked username "
                     f"'{username}' from {event.source_ip}."

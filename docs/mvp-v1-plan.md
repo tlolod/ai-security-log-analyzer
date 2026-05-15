@@ -38,6 +38,7 @@ Implemented capabilities include:
 - JSON configuration system
 - Configurable severity policy
 - Detection rule metadata
+- MITRE ATT&CK mapping metadata
 - JSON alert export
 - Alert summary statistics
 - pytest unit test suite
@@ -88,10 +89,11 @@ Status: complete.
 Implemented dataclasses:
 
 - `LogEvent`
+- `MitreAttackMetadata`
 - `Alert`
 - `RunStats`
 
-`Alert` includes detection metadata such as rule ID, rule name, rule version, alert type, and severity.
+`Alert` includes detection metadata such as rule ID, rule name, rule version, alert type, severity, and MITRE ATT&CK mapping.
 
 ### Milestone 3: Log Loading
 
@@ -173,7 +175,7 @@ MVP v1 is successful when:
 - Repeated failures from the same IP generate a brute-force alert.
 - Failed logins against targeted usernames generate suspicious-username alerts.
 - A successful login after repeated failures from the same IP generates a successful-after-failures alert.
-- Alerts include useful details such as source IP, count, time range, evidence, severity, and rule metadata.
+- Alerts include useful details such as source IP, count, time range, evidence, severity, rule metadata, and MITRE ATT&CK metadata.
 - Allowed IPs suppress supported alerts.
 - Config files are validated clearly and safely.
 - Non-matching lines are skipped safely.

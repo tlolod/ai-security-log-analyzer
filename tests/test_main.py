@@ -109,6 +109,11 @@ def test_run_writes_json_output_file(tmp_path: Path) -> None:
     assert "alerts" in payload
     assert "summary" in payload
     assert payload["alerts"][0]["alert_type"] == "brute_force_suspected"
+    assert payload["alerts"][0]["mitre_attack"] == {
+        "tactic": "Credential Access",
+        "technique_id": "T1110",
+        "technique": "Brute Force",
+    }
 
 
 def test_run_uses_config_file_values(tmp_path: Path, capsys) -> None:

@@ -7,13 +7,21 @@ from pathlib import Path
 import pytest
 
 from src.log_analyzer.formatter import build_alert_summary, format_alert, write_alerts_to_json
-from src.log_analyzer.models import Alert
+from src.log_analyzer.models import Alert, MitreAttackMetadata
+
+
+MITRE_ATTACK = MitreAttackMetadata(
+    tactic="Credential Access",
+    technique_id="T1110",
+    technique="Brute Force",
+)
 
 
 def make_alert(
     alert_type: str = "brute_force_suspected",
     severity: str = "medium",
     source_ip: str = "203.0.113.10",
+    mitre_attack: MitreAttackMetadata | None = MITRE_ATTACK,
 ) -> Alert:
     """Create a deterministic alert for formatter tests."""
     return Alert(
@@ -22,6 +30,7 @@ def make_alert(
         rule_name="SSH Brute Force Suspected",
         rule_version="1.0",
         severity=severity,
+        mitre_attack=mitre_attack,
         message="Detected 5 failed login attempts from 203.0.113.10 within 10 minutes.",
         source_ip=source_ip,
         first_seen=datetime(2026, 5, 11, 21, 33, 1),
@@ -42,11 +51,25 @@ def test_format_alert_returns_json_serializable_dict() -> None:
     assert alert_data["rule_name"] == "SSH Brute Force Suspected"
     assert alert_data["rule_version"] == "1.0"
     assert alert_data["severity"] == "medium"
+    assert alert_data["mitre_attack"] == {
+        "tactic": "Credential Access",
+        "technique_id": "T1110",
+        "technique": "Brute Force",
+    }
     assert alert_data["source_ip"] == "203.0.113.10"
     assert alert_data["first_seen"] == "2026-05-11T21:33:01"
     assert alert_data["last_seen"] == "2026-05-11T21:37:55"
     assert alert_data["failed_count"] == 5
     assert alert_data["evidence"] == ["sample sanitized log line"]
+
+
+def test_format_alert_handles_missing_mitre_metadata() -> None:
+    """Alerts without a MITRE mapping should serialize mitre_attack as None."""
+    alert = make_alert(mitre_attack=None)
+
+    alert_data = format_alert(alert)
+
+    assert alert_data["mitre_attack"] is None
 
 
 def test_write_alerts_to_json_writes_alert_payload(tmp_path: Path) -> None:
@@ -65,6 +88,7 @@ def test_write_alerts_to_json_writes_alert_payload(tmp_path: Path) -> None:
     assert payload["alerts"][0]["rule_id"] == "AUTH-001"
     assert payload["alerts"][0]["rule_name"] == "SSH Brute Force Suspected"
     assert payload["alerts"][0]["rule_version"] == "1.0"
+    assert payload["alerts"][0]["mitre_attack"]["technique_id"] == "T1110"
     assert payload["alerts"][0]["source_ip"] == "203.0.113.10"
     assert payload["alerts"][0]["first_seen"] == "2026-05-11T21:33:01"
 

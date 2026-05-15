@@ -48,8 +48,9 @@ Alerts include stable rule metadata:
 - `rule_version`
 - `alert_type`
 - `severity`
+- `mitre_attack`
 
-This metadata makes alerts easier to understand, test, export, and extend later.
+MITRE ATT&CK mapping metadata helps connect these beginner-friendly rules to a common security framework. This metadata makes alerts easier to understand, test, export, and extend later.
 
 ## High-Level Architecture
 
@@ -225,6 +226,11 @@ The sample log intentionally includes repeated failed SSH logins, a successful l
   "rule_name": "SSH Brute Force Suspected",
   "rule_version": "1.0",
   "severity": "medium",
+  "mitre_attack": {
+    "tactic": "Credential Access",
+    "technique_id": "T1110",
+    "technique": "Brute Force"
+  },
   "message": "Detected 5 failed login attempts from 203.0.113.10 within 10 minutes.",
   "source_ip": "203.0.113.10",
   "first_seen": "2026-05-11T21:33:01",
@@ -242,6 +248,11 @@ The sample log intentionally includes repeated failed SSH logins, a successful l
   "rule_name": "Successful SSH Login After Failures",
   "rule_version": "1.0",
   "severity": "high",
+  "mitre_attack": {
+    "tactic": "Credential Access",
+    "technique_id": "T1110",
+    "technique": "Brute Force"
+  },
   "message": "Detected successful login for 'alice' from 203.0.113.10 after 6 failed login attempts within 10 minutes.",
   "source_ip": "203.0.113.10",
   "first_seen": "2026-05-11T21:33:01",

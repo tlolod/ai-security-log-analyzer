@@ -31,6 +31,15 @@ class LogEvent:
 
 
 @dataclass
+class MitreAttackMetadata:
+    """MITRE ATT&CK mapping metadata for a detection rule."""
+
+    tactic: str
+    technique_id: str
+    technique: str
+
+
+@dataclass
 class Alert:
     """A structured security finding created by a detection rule.
 
@@ -43,6 +52,7 @@ class Alert:
     rule_name: str
     rule_version: str
     severity: str
+    mitre_attack: MitreAttackMetadata | None
     message: str
     source_ip: str
     first_seen: datetime

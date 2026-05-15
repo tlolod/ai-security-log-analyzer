@@ -76,6 +76,7 @@ The core idea is to separate raw text handling, configuration validation, detect
 Defines shared data structures:
 
 - `LogEvent`
+- `MitreAttackMetadata`
 - `Alert`
 - `RunStats`
 
@@ -88,8 +89,9 @@ These models use Python dataclasses and type hints so data is easy to inspect an
 - `rule_name`
 - `rule_version`
 - `severity`
+- `mitre_attack`
 
-Stable metadata helps future contributors understand which rule created each alert.
+Stable metadata helps future contributors understand which rule created each alert and how it maps to common security frameworks such as MITRE ATT&CK.
 
 ### `config.py`
 
@@ -154,6 +156,7 @@ The detector should:
 - Apply deterministic detection rules.
 - Respect configured allowed IP suppression where appropriate.
 - Use configured severity policy values instead of hardcoded alert severities.
+- Attach MITRE ATT&CK mapping metadata where appropriate.
 - Return structured `Alert` objects.
 
 It should not read files, parse raw log text, validate JSON config files, print output, or write export files.
@@ -165,6 +168,7 @@ Responsible for output formatting.
 It should:
 
 - Convert alerts into JSON-serializable dictionaries.
+- Serialize MITRE ATT&CK metadata in alert output.
 - Print alert details consistently.
 - Build alert summary statistics.
 - Print alert summaries.
@@ -220,6 +224,7 @@ The current detector supports:
 - Exact IP allowlist suppression through `allowed_ips`.
 - Configurable severity labels through `severity_policy`.
 - Stable rule metadata for every alert.
+- MITRE ATT&CK mapping metadata for current credential attack rules.
 
 Detection rules should continue to return structured `Alert` objects instead of printing or writing output directly.
 

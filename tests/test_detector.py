@@ -19,6 +19,14 @@ SEVERITY_POLICY = {
 }
 
 
+def assert_brute_force_mitre_metadata(alert) -> None:
+    """Assert that an alert has the expected MITRE ATT&CK brute-force mapping."""
+    assert alert.mitre_attack is not None
+    assert alert.mitre_attack.tactic == "Credential Access"
+    assert alert.mitre_attack.technique_id == "T1110"
+    assert alert.mitre_attack.technique == "Brute Force"
+
+
 def make_log_event(
     timestamp: datetime,
     source_ip: str,
@@ -58,6 +66,7 @@ def test_detect_failed_login_bursts_creates_alert_when_threshold_met() -> None:
     assert alert.rule_name == "SSH Brute Force Suspected"
     assert alert.rule_version == "1.0"
     assert alert.severity == "medium"
+    assert_brute_force_mitre_metadata(alert)
     assert alert.source_ip == "203.0.113.10"
     assert alert.first_seen == start_time
     assert alert.last_seen == start_time + timedelta(minutes=4)
@@ -187,6 +196,7 @@ def test_detect_suspicious_usernames_creates_alert_for_targeted_username() -> No
     assert alert.rule_name == "Suspicious Username Targeted"
     assert alert.rule_version == "1.0"
     assert alert.severity == "low"
+    assert_brute_force_mitre_metadata(alert)
     assert alert.source_ip == "203.0.113.10"
     assert alert.first_seen == event.timestamp
     assert alert.last_seen == event.timestamp
@@ -435,6 +445,7 @@ def test_detect_successful_login_after_failures_creates_alert() -> None:
     assert alert.rule_name == "Successful SSH Login After Failures"
     assert alert.rule_version == "1.0"
     assert alert.severity == "high"
+    assert_brute_force_mitre_metadata(alert)
     assert alert.source_ip == "203.0.113.10"
     assert alert.first_seen == start_time
     assert alert.last_seen == success_event.timestamp

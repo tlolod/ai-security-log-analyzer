@@ -8,7 +8,19 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from .models import Alert, RunStats
+from .models import Alert, MitreAttackMetadata, RunStats
+
+
+def format_mitre_attack(metadata: MitreAttackMetadata | None) -> dict[str, str] | None:
+    """Convert MITRE ATT&CK metadata into a JSON-serializable dictionary."""
+    if metadata is None:
+        return None
+
+    return {
+        "tactic": metadata.tactic,
+        "technique_id": metadata.technique_id,
+        "technique": metadata.technique,
+    }
 
 
 def format_alert(alert: Alert) -> dict[str, object]:
@@ -23,6 +35,7 @@ def format_alert(alert: Alert) -> dict[str, object]:
         "rule_name": alert.rule_name,
         "rule_version": alert.rule_version,
         "severity": alert.severity,
+        "mitre_attack": format_mitre_attack(alert.mitre_attack),
         "message": alert.message,
         "source_ip": alert.source_ip,
         "first_seen": alert.first_seen.isoformat(),
