@@ -48,8 +48,7 @@ Export structured alert data with `--output`:
 PYTHONPATH=src python -m log_analyzer.main \
   --file sample_logs/auth_sample.log \
   --config config/default_config.json \
-  --output alerts.json \
-  --year 2026
+  --output alerts.json
 ```
 
 Example JSON structure:
@@ -132,27 +131,24 @@ Config + CLI -> Loader -> Parser -> Detectors -> Formatter/Exporter
 
 ```bash
 # Default run
-PYTHONPATH=src python -m log_analyzer.main --file sample_logs/auth_sample.log --year 2026
+PYTHONPATH=src python -m log_analyzer.main --file sample_logs/auth_sample.log
 
 # Use JSON config (--config)
 PYTHONPATH=src python -m log_analyzer.main \
   --file sample_logs/auth_sample.log \
-  --config config/default_config.json \
-  --year 2026
+  --config config/default_config.json
 
 # Config + CLI overrides
 PYTHONPATH=src python -m log_analyzer.main \
   --file sample_logs/auth_sample.log \
   --config config/default_config.json \
   --threshold 6 \
-  --window 15 \
-  --year 2026
+  --window 15
 
 # Export JSON (--output)
 PYTHONPATH=src python -m log_analyzer.main \
   --file sample_logs/auth_sample.log \
-  --output alerts.json \
-  --year 2026
+  --output alerts.json
 ```
 
 
@@ -208,4 +204,4 @@ The project treats logs and configuration as untrusted input:
 
 ## License
 
-Currently for educational and portfolio use. A formal license may be added later.
+This project is licensed under the [MIT License](LICENSE).
